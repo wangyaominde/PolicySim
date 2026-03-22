@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { NetworkGraph } from '../components/visualizations';
+import { NetworkGraph, StanceMatrix, InterestFlow } from '../components/visualizations';
 import type {
   Agent,
   AgentResponse,
@@ -503,15 +503,9 @@ function VisualizationPanel() {
 
       {/* Visualization */}
       <div className="flex-1 min-h-[240px] mb-4">
-        {activeView === 'graph' ? (
-          <NetworkGraph />
-        ) : (
-          <div className="bg-surface-container rounded-lg h-full flex items-center justify-center">
-            <span className="text-sm text-on-surface-variant">
-              {activeView === 'matrix' ? 'Stance Matrix' : 'Interest Flow'} — Coming soon
-            </span>
-          </div>
-        )}
+        {activeView === 'graph' && <NetworkGraph />}
+        {activeView === 'matrix' && <StanceMatrix />}
+        {activeView === 'flow' && <InterestFlow />}
       </div>
 
       {/* Legend */}
