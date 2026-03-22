@@ -1,6 +1,84 @@
+# PolicySim — Multi-Agent Policy Simulation System
+
+> Simulate policy games with AI. Watch how different stakeholders react, form alliances, clash, and exploit rules.
+
+[中文文档](#policysim--多智能体政策仿真系统)
+
+## What is this?
+
+PolicySim is an LLM-powered multi-agent simulation platform. You input a policy — say, "Global ban on internal combustion engines by 2030" — and 8 AI-driven agents (capitalist, labor union, politician, media, environmental NGO, scientist, general public, financial investor) engage in multi-round strategic games around it.
+
+Each agent has its own values, resources, strategy, and stance. They make public statements, scheme behind the scenes, form alliances, discover regulatory loopholes, and even spawn "sub-agents" to carry out specialized tasks — just like a CEO dispatching a lobbying team or an NGO mobilizing volunteer networks in the real world.
+
+## Core Capabilities
+
+**Parallel Multi-Agent Games**
+All 8 agents think and respond concurrently. The Web Worker multi-threaded architecture makes concurrent Claude API calls — no serial waiting. The main thread stays focused on rendering, keeping animations at a smooth 60fps.
+
+**SubAgent System**
+Parent agents can dynamically spawn sub-agents during gameplay. A capitalist sends out a lobbying team to win over the labor union; an NGO deploys a science advisor for data support; a politician's think tank maneuvers behind the scenes. These SubAgents execute tasks independently, report back, and influence the next round.
+
+**Live Relationship Network**
+A D3.js force-directed graph shows alliances and conflicts in real time. Main agents are large nodes; SubAgents orbit like satellites. Alliance edges are green, conflict edges are red, cross-family influence edges are orange. The graph transitions smoothly after each round.
+
+**Streaming Output + Typewriter Effect**
+Each agent's response renders in real time via streaming — you can watch them "think." Public statements, private thoughts, action plans, discovered loopholes — all revealed character by character.
+
+## Pages
+
+| Page | Description |
+|------|-------------|
+| Home | Enter policy text, select participating agents, configure simulation parameters, launch |
+| Simulation Workspace | Three-column layout: agent hierarchy tree / game timeline / relationship graph |
+| Report | Stance distribution, key turning points, SubAgent contributions, rule exploitations |
+| Agent Manager | View and edit agent archetypes, adjust value weights, manage SubAgent configurations |
+
+## Preset Agents
+
+| Agent | Core Interest | Strategy | SubAgents |
+|-------|---------------|----------|-----------|
+| 🏭 Capitalist | Profit maximization | Pragmatic | Lobbyist, Legal Counsel |
+| 👷 Labor Union | Job security | Conservative | Strike Organizer, Spokesperson |
+| 🏛️ Politician | Approval ratings | Opportunistic | Think Tank, Media Advisor |
+| 📰 Media | Reach / influence | Aggressive | Investigative Reporter, KOL |
+| 🌿 Environmental NGO | Sustainability | Aggressive | Volunteer Mobilizer, Science Advisor |
+| 🔬 Scientist | Technological progress | Pragmatic | Lab Director, Data Analyst |
+| 🌾 General Public | Quality of life | Conservative | Community Leader, Influencer |
+| 🏦 Financial Investor | ROI | Opportunistic | Analyst Team, Short Selling Group |
+
+## Tech Stack
+
+- **Framework**: React 18 + TypeScript
+- **Build**: Vite
+- **Styling**: Tailwind CSS v4 (Intelligence Lab dark design system)
+- **State**: Zustand + Immer
+- **Visualization**: D3.js v7 force-directed graph
+- **Animation**: Framer Motion
+- **Multi-threading**: Web Workers (API calls, alliance computation, graph layout — all off main thread)
+- **AI Backend**: Claude API (Streaming)
+
+## Getting Started
+
+```bash
+git clone https://github.com/wangyaominde/PolicySim.git
+cd PolicySim
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173`. Click "API Settings" in the top-right corner to enter your Claude API Key for real AI responses. You can also explore the full flow in Mock mode without a key.
+
+## License
+
+MIT
+
+---
+
 # PolicySim — 多智能体政策仿真系统
 
 > 用 AI 模拟政策博弈，观察不同利益群体如何反应、结盟、对抗和利用规则。
+
+[English](#policysim--multi-agent-policy-simulation-system)
 
 ## 这是什么？
 
