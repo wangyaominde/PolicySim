@@ -26,25 +26,37 @@ async function generateAgents(
 ): Promise<Agent[]> {
   const systemPrompt = `你是一个多智能体仿真系统的角色设计师。根据用户描述的场景，生成${count}个具有不同立场、利益和策略的角色。
 
+**最重要的原则：角色必须是高粒度的真实个体，不是泛泛的群体标签。**
+
+错误示范：❌ "老年用户"、"年轻消费者"、"企业管理者"
+正确示范：✅ "68岁退休教师/不会用智能机/子女在外地/有糖尿病"、"34岁外卖骑手/负债20万/刚结婚/住城中村"、"52岁民企老板/工厂300人/面临转型/孩子在国外读书"
+
 请以 JSON 数组格式输出，每个角色包含：
 {
-  "name": "角色名称（简短，2-6字）",
-  "avatar": "一个代表该角色的emoji",
-  "role": "角色描述（包含身份、背景、核心利益，100-200字）",
+  "name": "角色标签（用/分隔的多维特征，如：68岁退休教师/不会用智能机/独居/糖尿病）",
+  "avatar": "一个最能代表该角色的emoji",
+  "role": "角色完整画像（200-300字），必须包含：
+    1. 基本信息：年龄、职业、教育、收入水平
+    2. 生活处境：家庭结构、居住地、日常痛点
+    3. 与该场景的直接关系：为什么这个产品/政策跟TA有关
+    4. 核心诉求：TA最在意什么，TA的底线是什么
+    5. 信息渠道：TA怎么获取信息，谁能影响TA的判断
+    6. 隐藏动机：表面需求之下的深层心理（安全感/面子/焦虑等）",
   "values": { "economy": 0-1, "stability": 0-1, "environment": 0-1, "innovation": 0-1, "equality": 0-1 },
-  "resources": ["资源1", "资源2", "资源3"],
-  "influence": 1-10的整数,
+  "resources": ["该角色实际掌握的影响力资源，要具体，如：家族微信群200人、抖音粉丝5万、认识区卫健委的人"],
+  "influence": 1-10的整数（普通个体1-3，社区意见领袖4-6，行业从业者7-8，决策者9-10）,
   "strategy": "aggressive|conservative|opportunistic|pragmatic",
   "subAgentSlots": [
-    { "name": "子角色名称", "avatar": "emoji", "specialty": "专长描述", "autonomy": 0-1, "costPerRound": 1 }
+    { "name": "该角色会求助/依赖的人", "avatar": "emoji", "specialty": "这个人能帮TA做什么", "autonomy": 0-1, "costPerRound": 1 }
   ]
 }
 
 要求：
-- 角色之间要有明确的利益冲突和潜在合作空间
-- 覆盖不同的立场（支持者、反对者、中立者、有条件支持者）
-- 每个角色至少有1个SubAgent槽位，最多2个
-- values权重要体现角色的核心价值观差异
+- 每个角色必须是一个具体的、有血有肉的人，有年龄、有故事、有矛盾
+- 角色之间要有真实的利益冲突和可能的合作空间
+- 覆盖不同的社会阶层、年龄段、信息获取能力、利益诉求
+- SubAgent 必须是该角色现实中会求助的人（如：儿子、同事、律师朋友、社区群主）
+- name 字段用/分隔的多维标签，方便快速识别（如：28岁程序员/996/租房/近视800度）
 - 只输出 JSON 数组，不要加其他文字`;
 
   const headers: Record<string, string> = {
@@ -299,11 +311,11 @@ export default function AIAgentCreator({
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
                         rows={3}
-                        placeholder="描述你的场景、产品或政策..."
+                        placeholder="描述你的场景、产品或政策，越具体越好..."
                         className="w-full rounded-xl border border-white/10 bg-surface-container-low px-4 py-3 font-body text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none"
                       />
                       <p className="mt-1.5 text-xs text-on-surface-variant/60 font-body">
-                        例：验证一款新能源汽车是否满足不同用户群体的需求
+                        例：一款面向老年人的智能血糖监测手环，售价899元，需要连接手机App查看数据
                       </p>
                     </div>
 
@@ -352,11 +364,11 @@ export default function AIAgentCreator({
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
                         rows={2}
-                        placeholder="描述你想创建的角色..."
+                        placeholder="描述一个具体的人，包括年龄、职业、生活处境..."
                         className="w-full rounded-xl border border-white/10 bg-surface-container-low px-4 py-3 font-body text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none"
                       />
                       <p className="mt-1.5 text-xs text-on-surface-variant/60 font-body">
-                        例：一个关注数据隐私的互联网安全专家
+                        例：72岁独居老人，只会用微信语音，子女在外地，有高血压需要每天量血压
                       </p>
                     </div>
 
