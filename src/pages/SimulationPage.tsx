@@ -309,6 +309,36 @@ function AgentHierarchy({
   );
 }
 
+/** Skeleton loading card for agents that haven't started yet */
+function SkeletonCard({ agent }: { agent: Agent }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -12 }}
+      transition={{ duration: 0.35 }}
+      className="bg-surface-container rounded-lg p-5 mb-4"
+    >
+      <div className="flex items-center gap-3 mb-3">
+        <span className="text-2xl">{agent.avatar}</span>
+        <span className="font-headline text-sm text-on-surface font-semibold">{agent.name}</span>
+        <span className="inline-flex items-center px-2 py-0.5 text-[10px] rounded-full border bg-zinc-500/10 border-zinc-500/20">
+          <span className="w-8 h-2.5 bg-zinc-700/40 rounded animate-pulse" />
+        </span>
+      </div>
+      <div className="border-l-2 border-zinc-600 pl-4 space-y-2">
+        <div className="h-3 bg-zinc-700/30 rounded w-full animate-pulse" />
+        <div className="h-3 bg-zinc-700/30 rounded w-5/6 animate-pulse" />
+        <div className="h-3 bg-zinc-700/30 rounded w-4/6 animate-pulse" />
+      </div>
+      <div className="flex gap-1.5 mt-3">
+        <span className="w-12 h-5 bg-zinc-700/20 rounded-full animate-pulse" />
+        <span className="w-10 h-5 bg-zinc-700/20 rounded-full animate-pulse" />
+      </div>
+    </motion.div>
+  );
+}
+
 /** Center column: Single agent response card */
 function AgentResponseCard({
   response,
@@ -330,7 +360,8 @@ function AgentResponseCard({
   if (!agent) return null;
 
   const subs = subAgentInstances.filter((s) => s.parentId === agent.id);
-  const displayText = streamingText ?? response.publicStatement;
+  const isCurrentlyStreaming = response.isStreaming || (streamingText !== undefined && streamingText !== response.publicStatement);
+  const displayText = isCurrentlyStreaming && streamingText !== undefined ? streamingText : response.publicStatement;
 
   return (
     <motion.div
@@ -355,7 +386,7 @@ function AgentResponseCard({
       <div className="border-l-2 border-green-500 pl-4 mb-4">
         <p className="text-sm text-on-surface leading-relaxed font-body">
           {displayText}
-          {response.isStreaming && (
+          {isCurrentlyStreaming && (
             <motion.span
               animate={{ opacity: [1, 0] }}
               transition={{ repeat: Infinity, duration: 0.6 }}
@@ -521,6 +552,14 @@ function VisualizationPanel() {
 export default function SimulationPage() {
   const navigate = useNavigate();
 
+  // Cleanup worker on unmount
+  const workerCleanupRef = useRef<Worker | null>(null);
+  useEffect(() => {
+    return () => {
+      workerCleanupRef.current?.terminate();
+    };
+  }, []);
+
   // Stores
   const config = useSimulationStore((s) => s.config);
   const status = useSimulationStore((s) => s.status);
@@ -533,10 +572,15 @@ export default function SimulationPage() {
   const appendStreamChunk = useSimulationStore((s) => s.appendStreamChunk);
   const addResponse = useSimulationStore((s) => s.addResponse);
   const completeRound = useSimulationStore((s) => s.completeRound);
+  const initRound = useSimulationStore((s) => s.initRound);
   const addSubAgentInstance = useSimulationStore((s) => s.addSubAgentInstance);
 
   const allAgents = useAgentStore((s) => s.agents);
   const customAgents = useAgentStore((s) => s.customAgents);
+
+  const apiKey = useUIStore((s) => s.apiKey);
+  const apiBaseUrl = useUIStore((s) => s.apiBaseUrl);
+  const model = useUIStore((s) => s.model);
   const selectedIds = useAgentStore((s) => s.selectedIds);
 
   const expandedCards = useUIStore((s) => s.expandedCards);
@@ -545,16 +589,20 @@ export default function SimulationPage() {
   // Local state
   const [viewingRound, setViewingRound] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [preparing, setPreparing] = useState(true);
   const abortRef = useRef(false);
+  const autoPlayTriggered = useRef(false);
 
   const agents = [...allAgents, ...customAgents];
   const selectedAgents = agents.filter((a) => selectedIds.includes(a.id));
   const totalRounds = config?.totalRounds ?? 4;
 
-  // Redirect if no config — but also auto-start a mock simulation for demo
+  // Auto-play ref — always holds the latest playSim
+  const autoPlayRef = useRef<() => void>();
+
+  // On mount: set up config if missing, then auto-play after brief delay
   useEffect(() => {
     if (!config) {
-      // Auto-start a mock config for demo purposes
       startSimulation({
         id: 'mock-sim-' + Date.now(),
         policy: '2030年全面禁售燃油车 — 政府宣布自2030年起全面禁止销售传统燃油汽车',
@@ -565,25 +613,126 @@ export default function SimulationPage() {
         createdAt: Date.now(),
       });
     }
+    setPreparing(true);
+
+    const timer = setTimeout(() => {
+      setPreparing(false);
+      autoPlayTriggered.current = true;
+      // Use a small delay so autoPlayRef.current is bound to latest playSim
+      setTimeout(() => autoPlayRef.current?.(), 100);
+    }, 800);
+
+    return () => clearTimeout(timer);
   }, []);// eslint-disable-line react-hooks/exhaustive-deps
 
   // Get responses for the round being viewed
   const viewingRoundData = rounds.find((r) => r.roundNumber === viewingRound);
   const responses = viewingRoundData?.responses ?? [];
 
-  // Streaming simulation engine
-  const runSimulationRound = useCallback(async (round: number) => {
+  // --- Real API simulation via Web Worker ---
+  const workerRef = useRef<Worker | null>(null);
+
+  const runRealRound = useCallback((round: number): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (!workerRef.current) {
+        workerRef.current = new Worker(
+          new URL('../workers/api.worker.ts', import.meta.url),
+          { type: 'module' }
+        );
+      }
+      const worker = workerRef.current;
+
+      const policy = config?.policy ?? '';
+      // Build round context from previous round
+      let roundContext = '';
+      if (round > 1) {
+        const prevRound = rounds.find((r) => r.roundNumber === round - 1);
+        if (prevRound) {
+          roundContext = prevRound.responses
+            .map((r) => {
+              const a = agents.find((ag) => ag.id === r.agentId);
+              return `${a?.name ?? r.agentId}（${r.stance}）：${r.publicStatement.slice(0, 100)}`;
+            })
+            .join('\n');
+        }
+      }
+
+      // Pre-create the round so addResponse can push incrementally
+      initRound(round);
+      setViewingRound(round);
+
+      worker.onmessage = (e: MessageEvent) => {
+        const msg = e.data;
+        if (msg.type === 'AGENT_STREAM_CHUNK') {
+          appendStreamChunk(msg.agentId, msg.chunk);
+        } else if (msg.type === 'AGENT_COMPLETE') {
+          const resp = msg.response as AgentResponse;
+          addResponse({ ...resp, isStreaming: false, streamingText: resp.publicStatement });
+
+          // Spawn sub-agent instances for display
+          if (resp.spawnSubAgents?.length > 0) {
+            const agent = agents.find((a) => a.id === resp.agentId);
+            if (agent) {
+              for (const spawn of resp.spawnSubAgents) {
+                const slot = agent.subAgentSlots.find((s) => s.slotId === spawn.slotId);
+                if (slot) {
+                  addSubAgentInstance({
+                    ...slot,
+                    parentId: agent.id,
+                    task: spawn.task,
+                    status: 'active',
+                    result: null,
+                    spawnedAtRound: round,
+                  });
+                }
+              }
+            }
+          }
+        } else if (msg.type === 'ROUND_COMPLETE') {
+          // Round was pre-created; responses were added incrementally
+          resolve();
+        } else if (msg.type === 'ERROR') {
+          // Individual agent errors are handled — worker sends fallback AGENT_COMPLETE
+          // Only reject if it's a global error (no agentId)
+          if (!msg.agentId) {
+            reject(new Error(msg.error));
+          } else {
+            console.warn(`[Sim] Agent error: ${msg.error}`);
+          }
+        }
+      };
+
+      worker.postMessage({
+        type: 'START_ROUND',
+        agents: selectedAgents,
+        policy,
+        roundContext,
+        round,
+        apiKey,
+        apiBaseUrl,
+        model,
+        maxConcurrency: 5,
+      });
+    });
+  }, [config, rounds, agents, selectedAgents, apiKey, apiBaseUrl, model, appendStreamChunk, addResponse, initRound, addSubAgentInstance]);
+
+  // --- Mock simulation fallback (parallel batches of 2-3 agents) ---
+  const runMockRound = useCallback(async (round: number) => {
     if (abortRef.current) return;
 
     const mockResponses: AgentResponse[] = selectedAgents.map((agent) =>
       generateMockResponse(agent, round)
     );
 
-    // Stream each agent's response character by character
-    for (const resp of mockResponses) {
+    // Pre-create the round entry so addResponse can push completed agents incrementally
+    initRound(round);
+    setViewingRound(round);
+
+    // Stream a single agent's response character by character
+    const streamAgent = async (resp: AgentResponse) => {
       if (abortRef.current) return;
 
-      // Possibly spawn sub-agents
+      // Spawn sub-agents first
       if (resp.spawnSubAgents.length > 0) {
         const agent = agents.find((a) => a.id === resp.agentId);
         if (agent) {
@@ -603,32 +752,49 @@ export default function SimulationPage() {
         }
       }
 
-      // Stream the public statement
+      // Initialize streaming for this agent
+      appendStreamChunk(resp.agentId, '');
+
       const text = resp.publicStatement;
-      for (let i = 0; i <= text.length; i++) {
+      for (let i = 0; i < text.length; i++) {
         if (abortRef.current) return;
-        appendStreamChunk(resp.agentId, text[i - 1] ?? '');
-        await new Promise((r) => setTimeout(r, 12));
+        appendStreamChunk(resp.agentId, text[i]);
+        await new Promise((r) => setTimeout(r, 15));
       }
 
-      // Add the complete response
       addResponse({ ...resp, isStreaming: false, streamingText: text });
+    };
 
-      // Small pause between agents
-      await new Promise((r) => setTimeout(r, 200));
+    // Run agents in parallel batches of 2-3
+    const BATCH_SIZE = 3;
+    for (let i = 0; i < mockResponses.length; i += BATCH_SIZE) {
+      if (abortRef.current) break;
+      const batch = mockResponses.slice(i, i + BATCH_SIZE);
+      await Promise.all(batch.map(streamAgent));
+      // Brief pause between batches
+      if (i + BATCH_SIZE < mockResponses.length) {
+        await new Promise((r) => setTimeout(r, 300));
+      }
     }
 
-    // Complete the round
+    // Finalize the round: clear streaming state
     completeRound({
       roundNumber: round,
-      responses: mockResponses.map((r) => ({ ...r, isStreaming: false, streamingText: r.publicStatement })),
+      responses: [], // empty — responses were already added incrementally
       subAgentResults: {},
       alliances: [],
       timestamp: Date.now(),
     });
+  }, [selectedAgents, agents, appendStreamChunk, addResponse, initRound, completeRound, addSubAgentInstance]);
 
-    setViewingRound(round);
-  }, [selectedAgents, agents, appendStreamChunk, addResponse, completeRound, addSubAgentInstance]);
+  // Pick real or mock based on API key availability
+  const runSimulationRound = useCallback(async (round: number) => {
+    if (apiKey) {
+      await runRealRound(round);
+    } else {
+      await runMockRound(round);
+    }
+  }, [apiKey, runRealRound, runMockRound]);
 
   // Auto-play simulation
   const playSim = useCallback(async () => {
@@ -650,6 +816,11 @@ export default function SimulationPage() {
     }
     setIsPlaying(false);
   }, [isPlaying, rounds.length, totalRounds, runSimulationRound, setStatus]);
+
+  // Keep autoPlayRef in sync with latest playSim
+  useEffect(() => {
+    autoPlayRef.current = playSim;
+  }, [playSim]);
 
   const skipToNext = useCallback(async () => {
     if (isPlaying) return;
@@ -743,62 +914,111 @@ export default function SimulationPage() {
           </div>
         </div>
 
-        {/* Agent Response Cards */}
+        {/* Agent Response Cards — show completed, streaming, and skeleton cards */}
         <AnimatePresence mode="popLayout">
-          {responses.length > 0 ? (
-            responses.map((resp, idx) => {
-              const agent = agents.find((a) => a.id === resp.agentId);
-              const cardId = `${resp.agentId}-${resp.round}`;
-              return (
-                <motion.div
-                  key={cardId}
-                  transition={{ delay: idx * 0.08 }}
-                >
-                  <AgentResponseCard
-                    response={resp}
-                    agent={agent}
-                    agents={agents}
-                    subAgentInstances={subAgentInstances}
-                    isExpanded={expandedCards.includes(cardId)}
-                    onToggle={() => toggleCardExpansion(cardId)}
-                    streamingText={streamingResponses[resp.agentId]}
-                  />
-                </motion.div>
-              );
-            })
-          ) : (
-            /* Show streaming in-progress cards for current round */
-            selectedAgents
-              .filter((a) => streamingResponses[a.id] !== undefined)
-              .map((agent, idx) => (
-                <motion.div
-                  key={`streaming-${agent.id}`}
-                  initial={{ opacity: 0, y: 24 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.08, duration: 0.35 }}
-                  className="bg-surface-container rounded-lg p-5 mb-4"
-                >
-                  <div className="flex items-center gap-3 mb-3">
-                    <span className="text-2xl">{agent.avatar}</span>
-                    <span className="font-headline text-sm text-on-surface font-semibold">{agent.name}</span>
-                  </div>
-                  <div className="border-l-2 border-green-500 pl-4">
-                    <p className="text-sm text-on-surface leading-relaxed font-body">
-                      {streamingResponses[agent.id]}
-                      <motion.span
-                        animate={{ opacity: [1, 0] }}
-                        transition={{ repeat: Infinity, duration: 0.6 }}
-                        className="inline-block w-1.5 h-4 bg-primary ml-0.5 align-text-bottom"
+          {(() => {
+            // IDs of agents that already have completed responses for this round
+            const completedIds = new Set(responses.map((r) => r.agentId));
+            // IDs of agents currently streaming (not yet completed)
+            // Check for key existence (even empty string means streaming has started)
+            const streamingIds = selectedAgents
+              .filter((a) => !completedIds.has(a.id) && a.id in streamingResponses)
+              .map((a) => a.id);
+            // IDs of agents not yet started (skeleton)
+            const pendingAgents = selectedAgents.filter(
+              (a) => !completedIds.has(a.id) && !streamingIds.includes(a.id)
+            );
+            const isRunning = isPlaying || status === 'running';
+
+            return (
+              <>
+                {/* Completed response cards */}
+                {responses.map((resp, idx) => {
+                  const agent = agents.find((a) => a.id === resp.agentId);
+                  const cardId = `${resp.agentId}-${resp.round}`;
+                  return (
+                    <motion.div key={cardId} transition={{ delay: idx * 0.08 }}>
+                      <AgentResponseCard
+                        response={resp}
+                        agent={agent}
+                        agents={agents}
+                        subAgentInstances={subAgentInstances}
+                        isExpanded={expandedCards.includes(cardId)}
+                        onToggle={() => toggleCardExpansion(cardId)}
+                        streamingText={streamingResponses[resp.agentId]}
                       />
-                    </p>
-                  </div>
-                </motion.div>
-              ))
-          )}
+                    </motion.div>
+                  );
+                })}
+
+                {/* Currently streaming cards (not yet in responses) */}
+                {streamingIds.map((id) => {
+                  const agent = agents.find((a) => a.id === id);
+                  if (!agent) return null;
+                  return (
+                    <motion.div
+                      key={`streaming-${id}`}
+                      initial={{ opacity: 0, y: 24 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -12 }}
+                      transition={{ duration: 0.35 }}
+                      className="bg-surface-container rounded-lg p-5 mb-4"
+                    >
+                      <div className="flex items-center gap-3 mb-3">
+                        <span className="text-2xl">{agent.avatar}</span>
+                        <span className="font-headline text-sm text-on-surface font-semibold">{agent.name}</span>
+                      </div>
+                      <div className="border-l-2 border-green-500 pl-4">
+                        <p className="text-sm text-on-surface leading-relaxed font-body">
+                          {streamingResponses[id]}
+                          <motion.span
+                            animate={{ opacity: [1, 0] }}
+                            transition={{ repeat: Infinity, duration: 0.6 }}
+                            className="inline-block w-1.5 h-4 bg-primary ml-0.5 align-text-bottom"
+                          />
+                        </p>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+
+                {/* Skeleton cards for agents that haven't started yet (only during running) */}
+                {isRunning && pendingAgents.map((agent) => (
+                  <SkeletonCard key={`skeleton-${agent.id}`} agent={agent} />
+                ))}
+              </>
+            );
+          })()}
         </AnimatePresence>
 
-        {/* Empty state */}
-        {responses.length === 0 && Object.keys(streamingResponses).length === 0 && (
+        {/* Preparing state — only show when nothing else is visible */}
+        {preparing && responses.length === 0 && Object.keys(streamingResponses).length === 0 && (
+          <div className="flex flex-col items-center justify-center h-64 text-on-surface-variant">
+            <motion.div
+              animate={{ opacity: [0.4, 1, 0.4] }}
+              transition={{ repeat: Infinity, duration: 1.5 }}
+              className="text-sm mb-2"
+            >
+              Preparing simulation...
+            </motion.div>
+            <div className="flex gap-1 mt-3">
+              {selectedAgents.slice(0, 5).map((a) => (
+                <motion.span
+                  key={a.id}
+                  animate={{ y: [0, -6, 0] }}
+                  transition={{ repeat: Infinity, duration: 0.8, delay: Math.random() * 0.5 }}
+                  className="text-xl"
+                >
+                  {a.avatar}
+                </motion.span>
+              ))}
+            </div>
+            <p className="text-xs mt-3">Setting up {selectedAgents.length} agent environments</p>
+          </div>
+        )}
+
+        {/* Empty state — only when not preparing and truly idle */}
+        {!preparing && !isPlaying && status !== 'running' && responses.length === 0 && Object.keys(streamingResponses).length === 0 && rounds.length === 0 && (
           <div className="flex flex-col items-center justify-center h-64 text-on-surface-variant">
             <p className="text-sm mb-2">Press Play to start the simulation</p>
             <p className="text-xs">Agents will debate the policy round by round</p>

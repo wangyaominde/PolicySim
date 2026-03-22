@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { PolicyType, SimulationConfig } from '../types';
 import { useAgentStore, useSimulationStore } from '../stores';
 import { PRESET_POLICY_TEMPLATES } from '../data/presetAgents';
+import AIAgentCreator from '../components/agents/AIAgentCreator';
 
 const POLICY_TYPE_OPTIONS: { label: string; value: PolicyType }[] = [
   { label: 'ECONOMIC', value: 'economic' },
@@ -42,9 +43,14 @@ export default function HomePage() {
 
   // Stores
   const agents = useAgentStore((s) => s.agents);
+  const customAgents = useAgentStore((s) => s.customAgents);
   const selectedIds = useAgentStore((s) => s.selectedIds);
   const toggleAgent = useAgentStore((s) => s.toggleAgent);
+  const addCustomAgent = useAgentStore((s) => s.addCustomAgent);
   const startSimulation = useSimulationStore((s) => s.startSimulation);
+
+  const [creatorOpen, setCreatorOpen] = useState(false);
+  const allAgents = useMemo(() => [...agents, ...customAgents], [agents, customAgents]);
 
   // Local state
   const [policyText, setPolicyText] = useState('');
@@ -238,7 +244,18 @@ export default function HomePage() {
             initial="hidden"
             animate="visible"
           >
-            {agents.map((agent) => {
+            {/* AI Create Agent button */}
+            <motion.div
+              variants={cardVariants}
+              onClick={() => setCreatorOpen(true)}
+              className="bg-surface-container border-2 border-dashed border-surface-variant rounded-lg p-4 cursor-pointer hover:border-primary/50 transition-colors flex flex-col items-center justify-center"
+            >
+              <span className="text-2xl mb-1">🤖</span>
+              <p className="text-sm font-medium text-on-surface-variant">AI 创建 Agent</p>
+              <p className="text-[10px] text-primary mt-1">描述场景自动生成</p>
+            </motion.div>
+
+            {allAgents.map((agent) => {
               const isSelected = selectedIds.includes(agent.id);
               const influenceDots = Math.round(agent.influence / 2);
 
@@ -382,6 +399,16 @@ export default function HomePage() {
           </motion.p>
         )}
       </motion.div>
+
+      {/* AI Agent Creator Modal */}
+      <AIAgentCreator
+        open={creatorOpen}
+        onClose={() => setCreatorOpen(false)}
+        onAgentsCreated={(newAgents) => {
+          newAgents.forEach((a) => addCustomAgent(a));
+          setCreatorOpen(false);
+        }}
+      />
     </div>
   );
 }

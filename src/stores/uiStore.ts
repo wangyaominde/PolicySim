@@ -8,6 +8,8 @@ interface UIState {
   timelinePosition: number;
   sidebarCollapsed: boolean;
   apiKey: string;
+  apiBaseUrl: string;
+  model: string;
   apiKeyModalOpen: boolean;
 
   // Actions
@@ -25,7 +27,9 @@ export const useUIStore = create<UIState>()(
     expandedCards: [],
     timelinePosition: 0,
     sidebarCollapsed: false,
-    apiKey: '',
+    apiKey: import.meta.env.VITE_API_KEY || localStorage.getItem('policysim_api_key') || '',
+    apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'https://api.anthropic.com',
+    model: import.meta.env.VITE_MODEL || 'claude-sonnet-4-20250514',
     apiKeyModalOpen: false,
 
     setActiveView: (view) => set((state) => {

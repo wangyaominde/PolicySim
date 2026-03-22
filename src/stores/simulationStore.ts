@@ -23,6 +23,7 @@ interface SimulationState {
   setStatus: (status: SimulationStatus) => void;
   addResponse: (response: AgentResponse) => void;
   appendStreamChunk: (agentId: string, chunk: string) => void;
+  initRound: (roundNumber: number) => void;
   completeRound: (round: SimulationRound) => void;
   addSubAgentInstance: (instance: SubAgentInstance) => void;
   updateSubAgentResult: (parentId: string, slotId: string, result: SubAgentResult) => void;
@@ -48,7 +49,7 @@ export const useSimulationStore = create<SimulationState>()(
       state.config = config;
       state.rounds = [];
       state.currentRound = 1;
-      state.status = 'running';
+      state.status = 'configuring';
       state.subAgentInstances = [];
       state.streamingResponses = {};
       state.error = null;
@@ -74,8 +75,32 @@ export const useSimulationStore = create<SimulationState>()(
       state.streamingResponses[agentId] += chunk;
     }),
 
+    initRound: (roundNumber) => set((state) => {
+      // Create an empty round entry so addResponse can push to it incrementally
+      const exists = state.rounds.find(r => r.roundNumber === roundNumber);
+      if (!exists) {
+        state.rounds.push({
+          roundNumber,
+          responses: [],
+          subAgentResults: {},
+          alliances: [],
+          timestamp: Date.now(),
+        });
+      }
+      state.currentRound = roundNumber;
+    }),
+
     completeRound: (round) => set((state) => {
-      state.rounds.push(round);
+      const existing = state.rounds.find(r => r.roundNumber === round.roundNumber);
+      if (existing) {
+        // Round was pre-created via initRound; update with final data if provided
+        if (round.responses.length > 0) {
+          existing.responses = round.responses;
+        }
+        existing.timestamp = round.timestamp;
+      } else {
+        state.rounds.push(round);
+      }
       state.currentRound = round.roundNumber + 1;
       state.streamingResponses = {};
     }),

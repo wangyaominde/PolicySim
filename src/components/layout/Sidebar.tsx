@@ -47,10 +47,9 @@ const SupportIcon = () => (
 );
 
 const menuItems: MenuItem[] = [
-  { to: '/snapshots', label: 'Snapshots', icon: <SnapshotIcon /> },
-  { to: '/', label: 'Active Rounds', icon: <RoundsIcon />, highlighted: true },
-  { to: '/simulations', label: 'Simulations', icon: <SimulationsIcon /> },
-  { to: '/archive', label: 'Archive', icon: <ArchiveIcon /> },
+  { to: '/', label: 'Dashboard', icon: <SnapshotIcon /> },
+  { to: '/agents', label: 'Agent Library', icon: <SimulationsIcon /> },
+  { to: '/history', label: 'History', icon: <ArchiveIcon /> },
 ];
 
 export default function Sidebar() {
@@ -135,7 +134,7 @@ export default function Sidebar() {
       <div className="px-2 pb-4 space-y-1">
         {/* New Simulation button */}
         <NavLink
-          to="/new"
+          to="/"
           className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-on-surface transition-all"
           style={{
             background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-container))',
@@ -160,9 +159,9 @@ export default function Sidebar() {
         </NavLink>
 
         {/* Documentation */}
-        <a
-          href="#"
-          className="flex items-center gap-3 px-3 py-2 rounded-md text-xs text-on-surface-variant hover:text-on-surface transition-colors"
+        <button
+          type="button"
+          className="flex items-center gap-3 px-3 py-2 rounded-md text-xs text-on-surface-variant hover:text-on-surface transition-colors w-full"
         >
           <DocIcon />
           <AnimatePresence>
@@ -177,12 +176,12 @@ export default function Sidebar() {
               </motion.span>
             )}
           </AnimatePresence>
-        </a>
+        </button>
 
         {/* Support */}
-        <a
-          href="#"
-          className="flex items-center gap-3 px-3 py-2 rounded-md text-xs text-on-surface-variant hover:text-on-surface transition-colors"
+        <button
+          type="button"
+          className="flex items-center gap-3 px-3 py-2 rounded-md text-xs text-on-surface-variant hover:text-on-surface transition-colors w-full"
         >
           <SupportIcon />
           <AnimatePresence>
@@ -197,7 +196,7 @@ export default function Sidebar() {
               </motion.span>
             )}
           </AnimatePresence>
-        </a>
+        </button>
       </div>
     </motion.aside>
   );

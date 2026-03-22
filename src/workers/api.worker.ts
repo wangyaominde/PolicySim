@@ -1,8 +1,7 @@
 // API Worker - handles all Claude API calls off the main thread
-// Uses fetch directly since we can't use the SDK in a Worker
 
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
-const MODEL = 'claude-sonnet-4-20250514';
+let API_BASE_URL = 'https://api.anthropic.com';
+let MODEL = 'claude-sonnet-4-20250514';
 
 interface AgentConfig {
   id: string;
@@ -24,6 +23,8 @@ interface RoundConfig {
   roundContext: string;
   round: number;
   apiKey: string;
+  apiBaseUrl?: string;
+  model?: string;
   maxConcurrency: number;
 }
 
@@ -56,12 +57,128 @@ ${roundContext ? `上一轮各方反应摘要：\n${roundContext}` : ''}
 只输出 JSON，不要加其他文字。`;
 }
 
-async function callClaudeAPI(
+async function callAPI(
   systemPrompt: string,
   apiKey: string,
+  agentId: string,
   onChunk: (chunk: string) => void
 ): Promise<string> {
-  const response = await fetch(ANTHROPIC_API_URL, {
+  const apiUrl = `${API_BASE_URL}/v1/messages`;
+
+  // First try streaming
+  let response: Response;
+  try {
+    response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 2000,
+        stream: true,
+        messages: [{ role: 'user', content: systemPrompt }],
+      }),
+    });
+  } catch (err: any) {
+    // If streaming fetch fails (CORS etc), try non-streaming
+    console.warn(`[Worker] Streaming fetch failed for ${agentId}, trying non-streaming:`, err.message);
+    return callAPINonStreaming(systemPrompt, apiKey, agentId, onChunk);
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    console.error(`[Worker] API error for ${agentId}: ${response.status}`, errorText);
+    // Fallback to non-streaming
+    return callAPINonStreaming(systemPrompt, apiKey, agentId, onChunk);
+  }
+
+  // Check if we actually got a stream
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('event-stream') && !contentType.includes('text/event-stream')) {
+    // Non-streaming response — parse as JSON directly
+    const data = await response.json();
+    const text = data.content?.find((c: any) => c.type === 'text')?.text || '';
+    onChunk(text);
+    return text;
+  }
+
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let fullText = '';
+  let buffer = ''; // Buffer for incomplete SSE lines
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    // Process complete lines from buffer
+    const lines = buffer.split('\n');
+    // Keep the last potentially incomplete line in buffer
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const data = line.slice(6).trim();
+      if (!data || data === '[DONE]') continue;
+
+      try {
+        const parsed = JSON.parse(data);
+
+        // Handle text deltas (both Anthropic and MiniMax compatible)
+        if (parsed.type === 'content_block_delta') {
+          const delta = parsed.delta;
+          if (delta?.type === 'text_delta' && delta.text) {
+            fullText += delta.text;
+            onChunk(delta.text);
+          } else if (delta?.text && !delta?.type) {
+            // Anthropic native format
+            fullText += delta.text;
+            onChunk(delta.text);
+          }
+          // Skip thinking_delta, signature_delta etc
+        }
+      } catch {
+        // Malformed JSON chunk — skip
+      }
+    }
+  }
+
+  // Process any remaining buffer
+  if (buffer.startsWith('data: ')) {
+    const data = buffer.slice(6).trim();
+    if (data && data !== '[DONE]') {
+      try {
+        const parsed = JSON.parse(data);
+        if (parsed.type === 'content_block_delta') {
+          const t = parsed.delta?.text;
+          if (t) {
+            fullText += t;
+            onChunk(t);
+          }
+        }
+      } catch { /* skip */ }
+    }
+  }
+
+  return fullText;
+}
+
+// Fallback: non-streaming API call
+async function callAPINonStreaming(
+  systemPrompt: string,
+  apiKey: string,
+  agentId: string,
+  onChunk: (chunk: string) => void
+): Promise<string> {
+  const apiUrl = `${API_BASE_URL}/v1/messages`;
+
+  const response = await fetch(apiUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -72,51 +189,31 @@ async function callClaudeAPI(
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 2000,
-      stream: true,
       messages: [{ role: 'user', content: systemPrompt }],
     }),
   });
 
   if (!response.ok) {
-    throw new Error(`API error: ${response.status} ${response.statusText}`);
+    const errorText = await response.text().catch(() => '');
+    throw new Error(`API error ${response.status}: ${errorText.slice(0, 200)}`);
   }
 
-  const reader = response.body!.getReader();
-  const decoder = new TextDecoder();
-  let fullText = '';
+  const data = await response.json();
+  const text = data.content?.find((c: any) => c.type === 'text')?.text || '';
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    const chunk = decoder.decode(value, { stream: true });
-    const lines = chunk.split('\n');
-
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        const data = line.slice(6);
-        if (data === '[DONE]') continue;
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-            fullText += parsed.delta.text;
-            onChunk(parsed.delta.text);
-          }
-        } catch {
-          // Skip malformed JSON
-        }
-      }
-    }
+  // Simulate streaming by sending text in chunks
+  const chunkSize = 20;
+  for (let i = 0; i < text.length; i += chunkSize) {
+    onChunk(text.slice(i, i + chunkSize));
   }
 
-  return fullText;
+  return text;
 }
 
 function parseAgentResponse(text: string, agentId: string, round: number): any {
   try {
-    // Try to extract JSON from the response
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('No JSON found');
+    if (!jsonMatch) throw new Error('No JSON found in: ' + text.slice(0, 100));
     const parsed = JSON.parse(jsonMatch[0]);
     return {
       agentId,
@@ -146,14 +243,13 @@ function parseAgentResponse(text: string, agentId: string, round: number): any {
       })),
     };
   } catch (e) {
-    // Return a fallback response if JSON parsing fails
     return {
       agentId,
       round,
       stance: 'neutral' as const,
       impactScore: 0,
-      publicStatement: text.slice(0, 200),
-      privateThought: '（解析失败，原始文本已保留）',
+      publicStatement: text || '（AI 响应为空）',
+      privateThought: '（JSON 解析失败）',
       actions: [],
       allianceIntent: [],
       oppositionIntent: [],
@@ -163,71 +259,90 @@ function parseAgentResponse(text: string, agentId: string, round: number): any {
   }
 }
 
-// Limit concurrency
-async function runWithConcurrency<T>(
-  tasks: (() => Promise<T>)[],
-  maxConcurrency: number
-): Promise<PromiseSettledResult<T>[]> {
-  const results: PromiseSettledResult<T>[] = [];
-  const running: Promise<void>[] = [];
-
-  for (const task of tasks) {
-    const promise = task().then(
-      value => { results.push({ status: 'fulfilled', value }); },
-      reason => { results.push({ status: 'rejected', reason }); }
-    );
-    running.push(promise);
-
-    if (running.length >= maxConcurrency) {
-      await Promise.race(running);
-      // Remove completed promises
-      running.splice(0, running.length, ...running.filter(p => {
-        let resolved = false;
-        p.then(() => { resolved = true; });
-        return !resolved;
-      }));
-    }
-  }
-
-  await Promise.all(running);
-  return results;
-}
-
-// Main worker interface exposed via postMessage
+// Main worker message handler
 self.onmessage = async (event: MessageEvent) => {
   const { type, ...data } = event.data;
 
   if (type === 'START_ROUND') {
     const config = data as RoundConfig;
-    const { agents, policy, roundContext, round, apiKey, maxConcurrency } = config;
+    const { agents, policy, roundContext, round, apiKey, apiBaseUrl, model, maxConcurrency } = config;
+    if (apiBaseUrl) API_BASE_URL = apiBaseUrl;
+    if (model) MODEL = model;
 
-    const tasks = agents.map(agent => async () => {
-      const prompt = buildAgentPrompt(agent, policy, roundContext);
+    console.log(`[Worker] Starting round ${round} with ${agents.length} agents, model=${MODEL}, base=${API_BASE_URL}`);
 
-      const fullText = await callClaudeAPI(prompt, apiKey, (chunk) => {
-        self.postMessage({
-          type: 'AGENT_STREAM_CHUNK',
-          agentId: agent.id,
-          chunk,
-        });
-      });
+    // Run agents with concurrency limit
+    const semaphore = { active: 0 };
+    const allDone: Promise<void>[] = [];
 
-      const response = parseAgentResponse(fullText, agent.id, round);
+    for (const agent of agents) {
+      // Wait if at concurrency limit
+      while (semaphore.active >= maxConcurrency) {
+        await new Promise(r => setTimeout(r, 50));
+      }
 
-      self.postMessage({
-        type: 'AGENT_COMPLETE',
-        agentId: agent.id,
-        response,
-      });
+      semaphore.active++;
 
-      return response;
-    });
+      const task = (async () => {
+        try {
+          // Notify main thread that this agent started streaming
+          self.postMessage({
+            type: 'AGENT_STREAM_CHUNK',
+            agentId: agent.id,
+            chunk: '',
+          });
 
-    try {
-      await runWithConcurrency(tasks, maxConcurrency);
-      self.postMessage({ type: 'ROUND_COMPLETE', round });
-    } catch (error: any) {
-      self.postMessage({ type: 'ERROR', error: error.message });
+          const prompt = buildAgentPrompt(agent, policy, roundContext);
+          const fullText = await callAPI(prompt, apiKey, agent.id, (chunk) => {
+            self.postMessage({
+              type: 'AGENT_STREAM_CHUNK',
+              agentId: agent.id,
+              chunk,
+            });
+          });
+
+          console.log(`[Worker] Agent ${agent.id} done, got ${fullText.length} chars`);
+
+          const response = parseAgentResponse(fullText, agent.id, round);
+          self.postMessage({
+            type: 'AGENT_COMPLETE',
+            agentId: agent.id,
+            response,
+          });
+        } catch (err: any) {
+          console.error(`[Worker] Agent ${agent.id} failed:`, err);
+          self.postMessage({
+            type: 'ERROR',
+            agentId: agent.id,
+            error: `Agent ${agent.name} failed: ${err.message}`,
+          });
+          // Still send a fallback complete so the UI doesn't hang
+          self.postMessage({
+            type: 'AGENT_COMPLETE',
+            agentId: agent.id,
+            response: {
+              agentId: agent.id,
+              round,
+              stance: 'neutral',
+              impactScore: 0,
+              publicStatement: `[API 调用失败] ${err.message}`,
+              privateThought: '',
+              actions: [],
+              allianceIntent: [],
+              oppositionIntent: [],
+              ruleExploitation: '',
+              spawnSubAgents: [],
+            },
+          });
+        } finally {
+          semaphore.active--;
+        }
+      })();
+
+      allDone.push(task);
     }
+
+    await Promise.all(allDone);
+    self.postMessage({ type: 'ROUND_COMPLETE', round });
   }
 };

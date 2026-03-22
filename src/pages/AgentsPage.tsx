@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAgentStore } from '../stores';
 import type { Agent } from '../types';
+import AIAgentCreator from '../components/agents/AIAgentCreator';
 
 const cardHover = {
   rest: { y: 0, boxShadow: '0 0 0 rgba(0,0,0,0)' },
@@ -43,12 +44,13 @@ function getSliderColor(value: number): string {
 }
 
 export default function AgentsPage() {
-  const { agents, customAgents } = useAgentStore();
+  const { agents, customAgents, addCustomAgent } = useAgentStore();
   const allAgents = useMemo(() => [...agents, ...customAgents], [agents, customAgents]);
 
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [filter, setFilter] = useState('');
   const [manualOverride, setManualOverride] = useState(false);
+  const [creatorOpen, setCreatorOpen] = useState(false);
 
   const filteredAgents = useMemo(() => {
     if (!filter.trim()) return allAgents;
@@ -98,15 +100,17 @@ export default function AgentsPage() {
 
         {/* Agent Grid */}
         <div className="grid grid-cols-2 gap-4">
-          {/* Create New Agent card */}
+          {/* Create New Agent card — opens AI Agent Creator */}
           <motion.div
             className="bg-surface-container border-2 border-dashed border-surface-variant rounded-lg p-5 flex flex-col items-center justify-center min-h-[180px] cursor-pointer hover:border-primary/50 transition-colors"
             whileHover={{ scale: 1.01 }}
+            onClick={() => setCreatorOpen(true)}
           >
             <span className="text-4xl text-on-surface-variant mb-2">+</span>
             <span className="text-sm font-mono text-on-surface-variant tracking-wider">
-              Create New Agent
+              AI Create Agent
             </span>
+            <span className="text-xs text-primary mt-1">描述场景，AI 自动生成</span>
           </motion.div>
 
           {/* Agent cards */}
@@ -314,6 +318,16 @@ export default function AgentsPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* AI Agent Creator Modal */}
+      <AIAgentCreator
+        open={creatorOpen}
+        onClose={() => setCreatorOpen(false)}
+        onAgentsCreated={(newAgents) => {
+          newAgents.forEach((a) => addCustomAgent(a));
+          setCreatorOpen(false);
+        }}
+      />
     </div>
   );
 }

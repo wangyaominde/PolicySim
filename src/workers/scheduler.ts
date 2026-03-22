@@ -53,6 +53,8 @@ class WorkerScheduler {
     roundContext: string;
     round: number;
     apiKey: string;
+    apiBaseUrl?: string;
+    model?: string;
     maxConcurrency: number;
   }) {
     this.apiWorker?.postMessage({ type: 'START_ROUND', ...config });
