@@ -66,16 +66,21 @@ async function callAPI(
   const apiUrl = `${API_BASE_URL}/v1/messages`;
 
   // First try streaming
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'x-api-key': apiKey,
+    'anthropic-version': '2023-06-01',
+  };
+  // Only add this header for direct Anthropic API calls (not proxied)
+  if (API_BASE_URL.includes('anthropic.com')) {
+    headers['anthropic-dangerous-direct-browser-access'] = 'true';
+  }
+
   let response: Response;
   try {
     response = await fetch(apiUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
+      headers,
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 2000,
@@ -84,7 +89,6 @@ async function callAPI(
       }),
     });
   } catch (err: any) {
-    // If streaming fetch fails (CORS etc), try non-streaming
     console.warn(`[Worker] Streaming fetch failed for ${agentId}, trying non-streaming:`, err.message);
     return callAPINonStreaming(systemPrompt, apiKey, agentId, onChunk);
   }
@@ -178,14 +182,18 @@ async function callAPINonStreaming(
 ): Promise<string> {
   const apiUrl = `${API_BASE_URL}/v1/messages`;
 
+  const nsHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'x-api-key': apiKey,
+    'anthropic-version': '2023-06-01',
+  };
+  if (API_BASE_URL.includes('anthropic.com')) {
+    nsHeaders['anthropic-dangerous-direct-browser-access'] = 'true';
+  }
+
   const response = await fetch(apiUrl, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
+    headers: nsHeaders,
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 2000,

@@ -12,4 +12,13 @@ export default defineConfig({
   worker: {
     format: 'es',
   },
+  server: {
+    proxy: {
+      '/api/ai': {
+        target: 'https://api.minimaxi.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/ai/, '/anthropic'),
+      },
+    },
+  },
 })

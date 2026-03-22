@@ -230,9 +230,11 @@ function PolicySummary({
 function AgentHierarchy({
   agents,
   subAgentInstances,
+  responses,
 }: {
   agents: Agent[];
   subAgentInstances: SubAgentInstance[];
+  responses: AgentResponse[];
 }) {
   const [expandedAgents, setExpandedAgents] = useState<Set<string>>(new Set());
 
@@ -270,7 +272,7 @@ function AgentHierarchy({
                 )}
                 <span className="text-base">{agent.avatar}</span>
                 <span className="text-xs text-on-surface font-medium truncate flex-1">{agent.name}</span>
-                <StanceChip stance={pickRandom(STANCES)} />
+                <StanceChip stance={responses.find(r => r.agentId === agent.id)?.stance ?? 'neutral'} />
               </button>
 
               <AnimatePresence>
@@ -851,7 +853,7 @@ export default function SimulationPage() {
           totalRounds={totalRounds}
         />
         <div className="border-t border-white/5 pt-4">
-          <AgentHierarchy agents={selectedAgents} subAgentInstances={subAgentInstances} />
+          <AgentHierarchy agents={selectedAgents} subAgentInstances={subAgentInstances} responses={responses} />
         </div>
       </aside>
 

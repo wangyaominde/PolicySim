@@ -47,14 +47,18 @@ async function generateAgents(
 - values权重要体现角色的核心价值观差异
 - 只输出 JSON 数组，不要加其他文字`;
 
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'x-api-key': apiKey,
+    'anthropic-version': '2023-06-01',
+  };
+  if (apiBaseUrl.includes('anthropic.com')) {
+    headers['anthropic-dangerous-direct-browser-access'] = 'true';
+  }
+
   const response = await fetch(`${apiBaseUrl}/v1/messages`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
+    headers,
     body: JSON.stringify({
       model,
       max_tokens: 4000,

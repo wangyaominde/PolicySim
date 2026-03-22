@@ -28,7 +28,9 @@ export const useUIStore = create<UIState>()(
     timelinePosition: 0,
     sidebarCollapsed: false,
     apiKey: import.meta.env.VITE_API_KEY || localStorage.getItem('policysim_api_key') || '',
-    apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'https://api.anthropic.com',
+    apiBaseUrl: import.meta.env.VITE_API_BASE_URL
+      ? '/api/ai'  // Use Vite proxy in dev to avoid CORS
+      : 'https://api.anthropic.com',
     model: import.meta.env.VITE_MODEL || 'claude-sonnet-4-20250514',
     apiKeyModalOpen: false,
 
