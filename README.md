@@ -1,73 +1,71 @@
-# React + TypeScript + Vite
+# PolicySim — 多智能体政策仿真系统
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> 用 AI 模拟政策博弈，观察不同利益群体如何反应、结盟、对抗和利用规则。
 
-Currently, two official plugins are available:
+## 这是什么？
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+PolicySim 是一个 LLM 驱动的多智能体仿真平台。你输入一条政策（比如"2030年全面禁售燃油车"），系统会让 8 个 AI 角色——资本家、工会、政客、媒体、环保组织、科学家、普通民众、金融投资者——围绕这条政策展开多轮博弈。
 
-## React Compiler
+每个角色都有自己的价值观、资源、策略和立场。它们会公开表态、暗中算计、拉帮结派、发现规则漏洞，甚至派出"子智能体"执行细分任务——就像现实中 CEO 派律师团队游说、NGO 发动志愿者网络一样。
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 核心能力
 
-## Expanding the ESLint configuration
+**多角色并行博弈**
+8 个预设角色同时思考、同时回应，通过 Web Worker 多线程架构并发调用 Claude API，不串行等待。主线程专注渲染，动画稳定 60fps。
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+**SubAgent 子智能体系统**
+主角色可以在博弈中动态派生子智能体。资本家派出游说团队拉拢工会，环保组织派出科学顾问提供数据支撑，政客的智囊团在幕后运筹——这些 SubAgent 会独立执行任务并汇报结果，影响下一轮博弈走向。
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+**实时关系图谱**
+D3.js 力导向图实时展示角色间的联盟与对抗关系。主角色是大节点，SubAgent 像卫星环绕。联盟线是绿色，对抗线是红色，跨家族影响线是橙色。每一轮博弈后图谱平滑过渡到新状态。
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+**流式输出 + 打字机效果**
+每个角色的回应以流式方式实时渲染，你可以看到它们"思考"的过程。公开声明、私下想法、行动计划、规则漏洞发现——逐字呈现。
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 页面一览
+
+| 页面 | 功能 |
+|------|------|
+| 首页 | 输入政策文本，选择参与角色，配置仿真参数，一键启动 |
+| 仿真工作台 | 三栏布局：左侧角色层级树 / 中间博弈时间线 / 右侧关系图谱 |
+| 仿真报告 | 站队分布、关键转折点、SubAgent 贡献度、规则漏洞汇总 |
+| 角色管理 | 查看和编辑角色原型，调整价值观权重，管理 SubAgent 配置 |
+
+## 预设角色
+
+| 角色 | 核心利益 | 策略风格 | SubAgent |
+|------|----------|----------|----------|
+| 🏭 资本家 | 利润最大化 | 务实 | 游说专家、法律顾问 |
+| 👷 工会 | 就业保障 | 保守 | 罢工组织者、发言人 |
+| 🏛️ 政客 | 支持率 | 机会主义 | 智库、媒体顾问 |
+| 📰 媒体 | 流量/影响力 | 激进 | 调查记者、KOL |
+| 🌿 环保 NGO | 可持续发展 | 激进 | 志愿者动员、科学顾问 |
+| 🔬 科学家 | 技术发展 | 务实 | 实验室主任、数据分析师 |
+| 🌾 普通民众 | 生活质量 | 保守 | 社区领袖、网红博主 |
+| 🏦 金融投资者 | 投资回报 | 机会主义 | 分析师团队、做空集团 |
+
+## 技术栈
+
+- **前端框架**: React 18 + TypeScript
+- **构建工具**: Vite
+- **样式**: Tailwind CSS v4（Intelligence Lab 暗色设计系统）
+- **状态管理**: Zustand + Immer
+- **可视化**: D3.js v7 力导向图
+- **动画**: Framer Motion
+- **多线程**: Web Worker（API 调用、联盟计算、图谱布局均 off-main-thread）
+- **AI 后端**: Claude API（Streaming）
+
+## 快速开始
+
+```bash
+git clone https://github.com/wangyaominde/PolicySim.git
+cd PolicySim
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+启动后打开 `http://localhost:5173`。点击右上角 API Settings 输入你的 Claude API Key 即可使用真实 AI 响应；不输入 Key 也可以体验 Mock 模式下的完整流程。
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## License
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+MIT
