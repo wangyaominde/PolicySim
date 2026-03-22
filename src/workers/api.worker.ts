@@ -84,6 +84,7 @@ async function callAPI(
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 2000,
+        temperature: 0,
         stream: true,
         messages: [{ role: 'user', content: systemPrompt }],
       }),

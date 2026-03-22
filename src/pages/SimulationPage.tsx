@@ -11,6 +11,8 @@ import type {
   VisualizationView,
 } from '../types';
 import { useAgentStore, useSimulationStore, useUIStore } from '../stores';
+import { analyzeConsensus } from '../utils/consensus';
+import type { ConsensusReport } from '../types';
 
 /* ------------------------------------------------------------------ */
 /*  Mock data helpers                                                  */
@@ -588,6 +590,7 @@ export default function SimulationPage() {
   const [preparing, setPreparing] = useState(true);
   const abortRef = useRef(false);
   const autoPlayTriggered = useRef(false);
+  const [consensusReport, setConsensusReport] = useState<ConsensusReport | null>(null);
 
   const agents = [...allAgents, ...customAgents];
   const selectedAgents = agents.filter((a) => selectedIds.includes(a.id));
@@ -606,6 +609,7 @@ export default function SimulationPage() {
         totalRounds: 4,
         selectedAgentIds: selectedIds,
         workerConcurrency: 'medium',
+        consensusRuns: 1,
         createdAt: Date.now(),
       });
     }
@@ -1034,6 +1038,86 @@ export default function SimulationPage() {
             <p className="text-sm mb-2">Press Play to start the simulation</p>
             <p className="text-xs">Agents will debate the policy round by round</p>
           </div>
+        )}
+
+        {/* Consensus Report */}
+        {consensusReport && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-surface-container rounded-lg p-5 mb-6 border border-primary/20"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-lg">📊</span>
+              <h3 className="font-headline text-sm text-on-surface font-semibold">
+                Consensus Report ({consensusReport.totalRuns} runs)
+              </h3>
+              <span className={`text-[10px] uppercase tracking-widest font-medium px-2 py-0.5 rounded-full ${
+                consensusReport.overallConsistency >= 0.8 ? 'bg-green-500/15 text-green-400' :
+                consensusReport.overallConsistency >= 0.5 ? 'bg-amber-500/15 text-amber-400' :
+                'bg-red-500/15 text-red-400'
+              }`}>
+                {Math.round(consensusReport.overallConsistency * 100)}% consistency
+              </span>
+            </div>
+
+            {/* Stable conclusions */}
+            {consensusReport.stableConclusions.length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-[10px] uppercase tracking-widest text-primary font-medium mb-2">Stable Conclusions</h4>
+                <ul className="space-y-1">
+                  {consensusReport.stableConclusions.map((c, i) => (
+                    <li key={i} className="text-xs text-on-surface flex items-start gap-2">
+                      <span className="text-green-400 mt-0.5">✓</span>
+                      {c}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Volatile factors */}
+            {consensusReport.volatileFactors.length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-[10px] uppercase tracking-widest text-amber-400 font-medium mb-2">Volatile Factors</h4>
+                <ul className="space-y-1">
+                  {consensusReport.volatileFactors.map((c, i) => (
+                    <li key={i} className="text-xs text-on-surface-variant flex items-start gap-2">
+                      <span className="text-amber-400 mt-0.5">⚠</span>
+                      {c}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Per-agent stance consistency bars */}
+            <div>
+              <h4 className="text-[10px] uppercase tracking-widest text-on-surface-variant font-medium mb-2">Per-Agent Consistency</h4>
+              <div className="space-y-2">
+                {consensusReport.results.map((r) => {
+                  const agent = agents.find(a => a.id === r.agentId);
+                  const stanceLabel = { support: '支持', oppose: '反对', neutral: '中立', conditional: '有条件' }[r.dominantStance];
+                  const color = { support: 'bg-green-500', oppose: 'bg-red-500', neutral: 'bg-zinc-500', conditional: 'bg-amber-500' }[r.dominantStance];
+                  return (
+                    <div key={r.agentId} className="flex items-center gap-2">
+                      <span className="text-sm w-6">{agent?.avatar}</span>
+                      <span className="text-[11px] text-on-surface w-20 truncate">{agent?.name}</span>
+                      <div className="flex-1 h-2 bg-surface-container-highest rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${color}`} style={{ width: `${r.stanceConsistency * 100}%` }} />
+                      </div>
+                      <span className="text-[10px] text-on-surface-variant w-16 text-right">
+                        {stanceLabel} {Math.round(r.stanceConsistency * 100)}%
+                      </span>
+                      <span className="text-[10px] font-mono text-on-surface-variant w-10 text-right">
+                        {r.avgImpactScore > 0 ? '+' : ''}{r.avgImpactScore}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
         )}
 
         {/* Round navigation */}

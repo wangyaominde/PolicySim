@@ -59,6 +59,7 @@ export default function HomePage() {
   const [concurrency, setConcurrency] = useState<'low' | 'medium' | 'high'>('medium');
   const [templateDropdownOpen, setTemplateDropdownOpen] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [consensusRuns, setConsensusRuns] = useState(1);
 
   const selectedCount = selectedIds.length;
 
@@ -106,6 +107,7 @@ export default function HomePage() {
       totalRounds: rounds,
       selectedAgentIds: [...selectedIds],
       workerConcurrency: concurrency,
+      consensusRuns,
       createdAt: Date.now(),
     };
 
@@ -371,6 +373,35 @@ export default function HomePage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Consensus Mode */}
+          <div className="flex-1">
+            <label className="text-sm font-medium text-on-surface-variant mb-2 block">
+              Consensus Mode
+            </label>
+            <div className="flex gap-1 bg-surface-container-highest rounded-lg p-1">
+              {[
+                { label: 'Single', value: 1 },
+                { label: '×3', value: 3 },
+                { label: '×5', value: 5 },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setConsensusRuns(opt.value)}
+                  className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
+                    consensusRuns === opt.value
+                      ? 'bg-primary text-on-primary shadow-sm'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-on-surface-variant mt-1">
+              {consensusRuns > 1 ? `Run ${consensusRuns} times, show consistency scores` : 'Standard single run'}
+            </p>
           </div>
 
           {/* Launch */}

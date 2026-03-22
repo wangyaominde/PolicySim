@@ -119,7 +119,30 @@ export interface SimulationConfig {
   totalRounds: number;
   selectedAgentIds: string[];
   workerConcurrency: 'low' | 'medium' | 'high';
+  consensusRuns: number;       // 1 = single run, 3-5 = consensus mode
   createdAt: number;
+}
+
+// Consensus analysis result
+export interface ConsensusResult {
+  agentId: string;
+  stanceDistribution: Record<Stance, number>;  // stance → count across runs
+  dominantStance: Stance;
+  stanceConsistency: number;   // 0-1, how often the dominant stance appeared
+  avgImpactScore: number;
+  impactScoreRange: [number, number];
+  commonActions: { type: string; frequency: number }[];
+  commonAllies: { agentId: string; frequency: number }[];
+  commonRivals: { agentId: string; frequency: number }[];
+  representativeStatement: string;  // from the most "median" run
+}
+
+export interface ConsensusReport {
+  totalRuns: number;
+  overallConsistency: number;  // average consistency across all agents
+  results: ConsensusResult[];
+  stableConclusions: string[];   // conclusions that appeared in >80% of runs
+  volatileFactors: string[];     // conclusions that varied significantly
 }
 
 export type SimulationStatus = 'idle' | 'configuring' | 'running' | 'paused' | 'completed' | 'error';
