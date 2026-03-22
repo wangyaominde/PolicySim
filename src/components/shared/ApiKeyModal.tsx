@@ -4,36 +4,81 @@ import { useUIStore } from '../../stores/uiStore';
 import Button from './Button';
 
 const STORAGE_KEY = 'policysim_api_key';
+const BASE_URL_KEY = 'policysim_api_base_url';
+const MODEL_KEY = 'policysim_model';
+
+type ProviderPreset = 'anthropic' | 'minimax' | 'custom';
+
+const PRESETS: Record<ProviderPreset, { label: string; baseUrl: string; model: string }> = {
+  anthropic: { label: 'Anthropic (Official)', baseUrl: 'https://api.anthropic.com', model: 'claude-sonnet-4-20250514' },
+  minimax: { label: 'MiniMax', baseUrl: '/api/ai', model: 'MiniMax-M2.1' },
+  custom: { label: 'Custom', baseUrl: '', model: '' },
+};
+
+function detectPreset(baseUrl: string, model: string): ProviderPreset {
+  if (baseUrl === PRESETS.anthropic.baseUrl && model === PRESETS.anthropic.model) return 'anthropic';
+  if (baseUrl === PRESETS.minimax.baseUrl && model === PRESETS.minimax.model) return 'minimax';
+  return 'custom';
+}
 
 export default function ApiKeyModal() {
   const open = useUIStore((s) => s.apiKeyModalOpen);
   const setOpen = useUIStore((s) => s.setApiKeyModalOpen);
   const setApiKey = useUIStore((s) => s.setApiKey);
+  const setApiBaseUrl = useUIStore((s) => s.setApiBaseUrl);
+  const setModel = useUIStore((s) => s.setModel);
   const currentKey = useUIStore((s) => s.apiKey);
+  const currentBaseUrl = useUIStore((s) => s.apiBaseUrl);
+  const currentModel = useUIStore((s) => s.model);
 
-  const [inputValue, setInputValue] = useState('');
+  const [inputKey, setInputKey] = useState('');
+  const [inputBaseUrl, setInputBaseUrl] = useState('');
+  const [inputModel, setInputModel] = useState('');
   const [showKey, setShowKey] = useState(false);
+  const [activePreset, setActivePreset] = useState<ProviderPreset>('anthropic');
 
   // Load from localStorage on mount
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      setApiKey(stored);
-    }
-  }, [setApiKey]);
+    const storedKey = localStorage.getItem(STORAGE_KEY);
+    const storedBaseUrl = localStorage.getItem(BASE_URL_KEY);
+    const storedModel = localStorage.getItem(MODEL_KEY);
+    if (storedKey) setApiKey(storedKey);
+    if (storedBaseUrl) setApiBaseUrl(storedBaseUrl);
+    if (storedModel) setModel(storedModel);
+  }, [setApiKey, setApiBaseUrl, setModel]);
 
-  // Sync input when modal opens
+  // Sync inputs when modal opens
   useEffect(() => {
     if (open) {
-      setInputValue(currentKey);
+      setInputKey(currentKey);
+      setInputBaseUrl(currentBaseUrl);
+      setInputModel(currentModel);
+      setActivePreset(detectPreset(currentBaseUrl, currentModel));
       setShowKey(false);
     }
-  }, [open, currentKey]);
+  }, [open, currentKey, currentBaseUrl, currentModel]);
+
+  const handlePresetChange = (preset: ProviderPreset) => {
+    setActivePreset(preset);
+    if (preset !== 'custom') {
+      setInputBaseUrl(PRESETS[preset].baseUrl);
+      setInputModel(PRESETS[preset].model);
+    }
+  };
 
   const handleSave = () => {
-    const trimmed = inputValue.trim();
-    setApiKey(trimmed);
-    localStorage.setItem(STORAGE_KEY, trimmed);
+    const trimmedKey = inputKey.trim();
+    const trimmedBaseUrl = inputBaseUrl.trim();
+    const trimmedModel = inputModel.trim();
+
+    setApiKey(trimmedKey);
+    setApiBaseUrl(trimmedBaseUrl);
+    setModel(trimmedModel);
+
+    localStorage.setItem(STORAGE_KEY, trimmedKey);
+    localStorage.setItem(BASE_URL_KEY, trimmedBaseUrl);
+    localStorage.setItem(MODEL_KEY, trimmedModel);
+
     setOpen(false);
   };
 
@@ -69,19 +114,42 @@ export default function ApiKeyModal() {
                 API Settings
               </h2>
               <p className="text-on-surface-variant text-sm mb-5">
-                Enter your Claude API key to run simulations.
+                Configure your AI provider to run simulations.
               </p>
 
-              {/* Input */}
-              <div className="relative mb-5">
+              {/* Provider Presets */}
+              <div className="mb-4">
+                <label className="block text-on-surface-variant text-xs font-medium mb-2">
+                  Provider
+                </label>
+                <div className="flex gap-2">
+                  {(Object.keys(PRESETS) as ProviderPreset[]).map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => handlePresetChange(key)}
+                      className={`flex-1 text-xs font-medium px-3 py-2 rounded-lg border transition-all ${
+                        activePreset === key
+                          ? 'bg-primary/15 border-primary/40 text-primary'
+                          : 'bg-surface-container-low border-transparent text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low/80'
+                      }`}
+                    >
+                      {PRESETS[key].label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* API Key */}
+              <div className="relative mb-4">
                 <label className="block text-on-surface-variant text-xs font-medium mb-1.5">
-                  Claude API Key
+                  API Key
                 </label>
                 <div className="relative">
                   <input
                     type={showKey ? 'text' : 'password'}
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
+                    value={inputKey}
+                    onChange={(e) => setInputKey(e.target.value)}
                     placeholder="sk-ant-..."
                     className="w-full bg-surface-container-low text-on-surface text-sm rounded-md px-3 py-2.5 pr-10 font-mono placeholder:text-on-surface-variant/40 outline-none focus:ring-1 focus:ring-primary/30 transition-all"
                   />
@@ -105,13 +173,47 @@ export default function ApiKeyModal() {
                 </div>
               </div>
 
+              {/* Base URL */}
+              <div className="mb-4">
+                <label className="block text-on-surface-variant text-xs font-medium mb-1.5">
+                  API Base URL
+                </label>
+                <input
+                  type="text"
+                  value={inputBaseUrl}
+                  onChange={(e) => {
+                    setInputBaseUrl(e.target.value);
+                    setActivePreset('custom');
+                  }}
+                  placeholder="https://api.anthropic.com"
+                  className="w-full bg-surface-container-low text-on-surface text-sm rounded-md px-3 py-2.5 font-mono placeholder:text-on-surface-variant/40 outline-none focus:ring-1 focus:ring-primary/30 transition-all"
+                />
+              </div>
+
+              {/* Model */}
+              <div className="mb-5">
+                <label className="block text-on-surface-variant text-xs font-medium mb-1.5">
+                  Model
+                </label>
+                <input
+                  type="text"
+                  value={inputModel}
+                  onChange={(e) => {
+                    setInputModel(e.target.value);
+                    setActivePreset('custom');
+                  }}
+                  placeholder="claude-sonnet-4-20250514"
+                  className="w-full bg-surface-container-low text-on-surface text-sm rounded-md px-3 py-2.5 font-mono placeholder:text-on-surface-variant/40 outline-none focus:ring-1 focus:ring-primary/30 transition-all"
+                />
+              </div>
+
               {/* Actions */}
               <div className="flex justify-end gap-3">
                 <Button variant="ghost" onClick={() => setOpen(false)}>
                   Cancel
                 </Button>
                 <Button variant="primary" onClick={handleSave}>
-                  Save Key
+                  Save Settings
                 </Button>
               </div>
             </motion.div>

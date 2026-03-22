@@ -957,6 +957,9 @@ export default function SimulationPage() {
                 {streamingIds.map((id) => {
                   const agent = agents.find((a) => a.id === id);
                   if (!agent) return null;
+                  // Calculate approximate progress from streaming text length
+                  const streamLen = (streamingResponses[id] || '').length;
+                  const progress = Math.min(95, Math.round(streamLen / 8)); // rough estimate
                   return (
                     <motion.div
                       key={`streaming-${id}`}
@@ -969,16 +972,28 @@ export default function SimulationPage() {
                       <div className="flex items-center gap-3 mb-3">
                         <span className="text-2xl">{agent.avatar}</span>
                         <span className="font-headline text-sm text-on-surface font-semibold">{agent.name}</span>
+                        <span className="text-[10px] uppercase tracking-widest text-primary font-medium bg-primary/10 px-2 py-0.5 rounded-full">
+                          Thinking...
+                        </span>
                       </div>
-                      <div className="border-l-2 border-green-500 pl-4">
-                        <p className="text-sm text-on-surface leading-relaxed font-body">
-                          {streamingResponses[id]}
-                          <motion.span
-                            animate={{ opacity: [1, 0] }}
-                            transition={{ repeat: Infinity, duration: 0.6 }}
-                            className="inline-block w-1.5 h-4 bg-primary ml-0.5 align-text-bottom"
+                      <div className="border-l-2 border-primary/40 pl-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex gap-1">
+                            <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1.2, delay: 0 }} className="w-2 h-2 rounded-full bg-primary" />
+                            <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1.2, delay: 0.2 }} className="w-2 h-2 rounded-full bg-primary" />
+                            <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1.2, delay: 0.4 }} className="w-2 h-2 rounded-full bg-primary" />
+                          </div>
+                          <span className="text-xs text-on-surface-variant">{agent.name} 正在分析政策并制定策略...</span>
+                        </div>
+                        {/* Progress bar */}
+                        <div className="mt-3 h-1 bg-surface-container-highest rounded-full overflow-hidden">
+                          <motion.div
+                            className="h-full bg-primary/60 rounded-full"
+                            initial={{ width: '0%' }}
+                            animate={{ width: `${progress}%` }}
+                            transition={{ duration: 0.3 }}
                           />
-                        </p>
+                        </div>
                       </div>
                     </motion.div>
                   );

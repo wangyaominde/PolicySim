@@ -18,6 +18,8 @@ interface UIState {
   setTimelinePosition: (position: number) => void;
   toggleSidebar: () => void;
   setApiKey: (key: string) => void;
+  setApiBaseUrl: (url: string) => void;
+  setModel: (model: string) => void;
   setApiKeyModalOpen: (open: boolean) => void;
 }
 
@@ -27,11 +29,10 @@ export const useUIStore = create<UIState>()(
     expandedCards: [],
     timelinePosition: 0,
     sidebarCollapsed: false,
-    apiKey: import.meta.env.VITE_API_KEY || localStorage.getItem('policysim_api_key') || '',
-    apiBaseUrl: import.meta.env.VITE_API_BASE_URL
-      ? '/api/ai'  // Use Vite proxy in dev to avoid CORS
-      : 'https://api.anthropic.com',
-    model: import.meta.env.VITE_MODEL || 'claude-sonnet-4-20250514',
+    apiKey: localStorage.getItem('policysim_api_key') || import.meta.env.VITE_API_KEY || '',
+    apiBaseUrl: localStorage.getItem('policysim_api_base_url')
+      || (import.meta.env.VITE_API_BASE_URL ? '/api/ai' : 'https://api.anthropic.com'),
+    model: localStorage.getItem('policysim_model') || import.meta.env.VITE_MODEL || 'claude-sonnet-4-20250514',
     apiKeyModalOpen: false,
 
     setActiveView: (view) => set((state) => {
@@ -57,6 +58,14 @@ export const useUIStore = create<UIState>()(
 
     setApiKey: (key) => set((state) => {
       state.apiKey = key;
+    }),
+
+    setApiBaseUrl: (url) => set((state) => {
+      state.apiBaseUrl = url;
+    }),
+
+    setModel: (model) => set((state) => {
+      state.model = model;
     }),
 
     setApiKeyModalOpen: (open) => set((state) => {
