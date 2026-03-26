@@ -60,10 +60,20 @@ export const useSimulationStore = create<SimulationState>()(
     }),
 
     addResponse: (response) => set((state) => {
-      const round = state.rounds.find(r => r.roundNumber === response.round);
-      if (round) {
-        round.responses.push(response);
+      let round = state.rounds.find(r => r.roundNumber === response.round);
+      if (!round) {
+        // Auto-create the round to avoid silently dropping the response
+        console.warn(`[SimStore] addResponse: round ${response.round} not initialized, auto-creating`);
+        round = {
+          roundNumber: response.round,
+          responses: [],
+          subAgentResults: {},
+          alliances: [],
+          timestamp: Date.now(),
+        };
+        state.rounds.push(round);
       }
+      round.responses.push(response);
       // Clear streaming text for this agent
       delete state.streamingResponses[response.agentId];
     }),

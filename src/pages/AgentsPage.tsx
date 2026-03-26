@@ -44,13 +44,14 @@ function getSliderColor(value: number): string {
 }
 
 export default function AgentsPage() {
-  const { agents, customAgents, addCustomAgent } = useAgentStore();
+  const { agents, customAgents, addCustomAgent, updateAgent } = useAgentStore();
   const allAgents = useMemo(() => [...agents, ...customAgents], [agents, customAgents]);
 
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [filter, setFilter] = useState('');
   const [manualOverride, setManualOverride] = useState(false);
   const [creatorOpen, setCreatorOpen] = useState(false);
+  const [editedValues, setEditedValues] = useState<Record<string, number>>({});
 
   const filteredAgents = useMemo(() => {
     if (!filter.trim()) return allAgents;
@@ -125,7 +126,7 @@ export default function AgentsPage() {
               variants={cardHover}
               initial="rest"
               whileHover="hover"
-              onClick={() => setSelectedAgent(agent)}
+              onClick={() => { setSelectedAgent(agent); setEditedValues({}); setManualOverride(false); }}
             >
               <div className="flex items-start justify-between mb-3">
                 <span className="text-3xl">{agent.avatar}</span>
@@ -246,7 +247,7 @@ export default function AgentsPage() {
               </div>
               <div className="space-y-4">
                 {valueDimensions.map(({ key, label }) => {
-                  const value = selectedAgent.values[key];
+                  const value = editedValues[key] ?? selectedAgent.values[key];
                   return (
                     <div key={key}>
                       <div className="flex items-center justify-between mb-1.5">
@@ -257,14 +258,28 @@ export default function AgentsPage() {
                           {(value * 100).toFixed(0)}%
                         </span>
                       </div>
-                      <div className="h-2 bg-surface-container rounded-full overflow-hidden">
-                        <motion.div
-                          className={`h-full rounded-full ${getSliderColor(value)}`}
-                          initial={{ width: 0 }}
-                          animate={{ width: `${value * 100}%` }}
-                          transition={{ duration: 0.6, ease: 'easeOut' }}
+                      {manualOverride ? (
+                        <input
+                          type="range"
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          value={value}
+                          onChange={(e) =>
+                            setEditedValues((prev) => ({ ...prev, [key]: parseFloat(e.target.value) }))
+                          }
+                          className="w-full h-2 rounded-full appearance-none cursor-pointer accent-primary bg-surface-container"
                         />
-                      </div>
+                      ) : (
+                        <div className="h-2 bg-surface-container rounded-full overflow-hidden">
+                          <motion.div
+                            className={`h-full rounded-full ${getSliderColor(value)}`}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${value * 100}%` }}
+                            transition={{ duration: 0.6, ease: 'easeOut' }}
+                          />
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -301,7 +316,19 @@ export default function AgentsPage() {
             </div>
 
             {/* Save button */}
-            <button className="mt-auto w-full py-3 rounded-lg bg-primary text-on-surface font-mono text-sm tracking-wider font-semibold hover:opacity-90 transition-opacity bg-gradient-to-r from-primary to-primary/80">
+            <button
+              onClick={() => {
+                if (Object.keys(editedValues).length > 0) {
+                  updateAgent(selectedAgent.id, {
+                    values: { ...selectedAgent.values, ...editedValues },
+                  });
+                  setEditedValues({});
+                  setManualOverride(false);
+                }
+              }}
+              disabled={Object.keys(editedValues).length === 0}
+              className="mt-auto w-full py-3 rounded-lg bg-primary text-on-surface font-mono text-sm tracking-wider font-semibold hover:opacity-90 transition-opacity bg-gradient-to-r from-primary to-primary/80 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
               Save Archetype Configuration
             </button>
           </motion.div>

@@ -57,15 +57,27 @@ class WorkerScheduler {
     model?: string;
     maxConcurrency: number;
   }) {
-    this.apiWorker?.postMessage({ type: 'START_ROUND', ...config });
+    if (!this.apiWorker) {
+      console.warn('[Scheduler] Workers not initialized, auto-initializing');
+      this.init();
+    }
+    this.apiWorker!.postMessage({ type: 'START_ROUND', ...config });
   }
 
   computeAlliances(responses: AgentResponse[]) {
-    this.computeWorker?.postMessage({ type: 'COMPUTE_ALLIANCES', responses });
+    if (!this.computeWorker) {
+      console.warn('[Scheduler] Workers not initialized, auto-initializing');
+      this.init();
+    }
+    this.computeWorker!.postMessage({ type: 'COMPUTE_ALLIANCES', responses });
   }
 
   computeGraphLayout(nodes: any[], edges: any[], width: number, height: number) {
-    this.computeWorker?.postMessage({ type: 'COMPUTE_GRAPH_LAYOUT', nodes, edges, width, height });
+    if (!this.computeWorker) {
+      console.warn('[Scheduler] Workers not initialized, auto-initializing');
+      this.init();
+    }
+    this.computeWorker!.postMessage({ type: 'COMPUTE_GRAPH_LAYOUT', nodes, edges, width, height });
   }
 
   abort() {

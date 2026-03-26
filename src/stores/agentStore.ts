@@ -42,6 +42,11 @@ export const useAgentStore = create<AgentState>()(
     }),
 
     addCustomAgent: (agent) => set((state) => {
+      const allIds = [...state.agents, ...state.customAgents].map(a => a.id);
+      if (allIds.includes(agent.id)) {
+        console.warn(`[AgentStore] Agent with id "${agent.id}" already exists, skipping`);
+        return;
+      }
       state.customAgents.push(agent);
       state.selectedIds.push(agent.id);
     }),

@@ -80,6 +80,14 @@ function computeGraphLayout(input: GraphLayoutInput) {
   const centerY = height / 2;
   const radius = Math.min(width, height) * 0.35;
 
+  if (mainNodes.length === 0) {
+    // No main nodes — place sub-nodes at center as fallback
+    subNodes.forEach((node) => {
+      positions[node.id] = { x: centerX, y: centerY };
+    });
+    return positions;
+  }
+
   mainNodes.forEach((node, i) => {
     const angle = (2 * Math.PI * i) / mainNodes.length - Math.PI / 2;
     positions[node.id] = {

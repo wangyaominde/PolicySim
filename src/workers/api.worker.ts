@@ -197,7 +197,7 @@ async function callAPINonStreaming(
     headers: nsHeaders,
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 2000,
+      max_tokens: 8000,
       messages: [{ role: 'user', content: systemPrompt }],
     }),
   });
@@ -219,11 +219,23 @@ async function callAPINonStreaming(
   return text;
 }
 
+function extractFirstJsonObject(text: string): string | null {
+  const start = text.indexOf('{');
+  if (start === -1) return null;
+  let depth = 0;
+  for (let i = start; i < text.length; i++) {
+    if (text[i] === '{') depth++;
+    else if (text[i] === '}') depth--;
+    if (depth === 0) return text.slice(start, i + 1);
+  }
+  return null; // unbalanced braces
+}
+
 function parseAgentResponse(text: string, agentId: string, round: number): any {
   try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('No JSON found in: ' + text.slice(0, 100));
-    const parsed = JSON.parse(jsonMatch[0]);
+    const jsonStr = extractFirstJsonObject(text);
+    if (!jsonStr) throw new Error('No JSON found in: ' + text.slice(0, 100));
+    const parsed = JSON.parse(jsonStr);
     return {
       agentId,
       round,
