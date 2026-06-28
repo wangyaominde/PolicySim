@@ -268,7 +268,7 @@ export default function AIAgentCreator({
                     setApiKeyModalOpen(true);
                     handleClose();
                   }}
-                  className="rounded-lg bg-primary px-5 py-2 font-body text-sm font-medium text-on-surface transition-colors hover:brightness-110"
+                  className="rounded-lg bg-primary px-5 py-2 font-body text-sm font-semibold text-on-primary transition-colors hover:brightness-110"
                 >
                   打开 API Settings
                 </button>

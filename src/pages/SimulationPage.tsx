@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { NetworkGraph, StanceMatrix, InterestFlow } from '../components/visualizations';
 import type {
@@ -10,8 +9,7 @@ import type {
   SubAgentInstance,
   VisualizationView,
 } from '../types';
-import { useAgentStore, useSimulationStore, useUIStore } from '../stores';
-import { analyzeConsensus } from '../utils/consensus';
+import { useAgentStore, useSimulationStore, useUIStore, useHistoryStore } from '../stores';
 import type { ConsensusReport } from '../types';
 
 /* ------------------------------------------------------------------ */
@@ -347,7 +345,6 @@ function SkeletonCard({ agent }: { agent: Agent }) {
 function AgentResponseCard({
   response,
   agent,
-  agents,
   subAgentInstances,
   isExpanded,
   onToggle,
@@ -355,7 +352,6 @@ function AgentResponseCard({
 }: {
   response: AgentResponse;
   agent: Agent | undefined;
-  agents: Agent[];
   subAgentInstances: SubAgentInstance[];
   isExpanded: boolean;
   onToggle: () => void;
@@ -548,8 +544,6 @@ function VisualizationPanel() {
 /* ------------------------------------------------------------------ */
 
 export default function SimulationPage() {
-  const navigate = useNavigate();
-
   // Cleanup worker on unmount
   const workerCleanupRef = useRef<Worker | null>(null);
   useEffect(() => {
@@ -561,7 +555,6 @@ export default function SimulationPage() {
   // Stores
   const config = useSimulationStore((s) => s.config);
   const status = useSimulationStore((s) => s.status);
-  const currentRound = useSimulationStore((s) => s.currentRound);
   const rounds = useSimulationStore((s) => s.rounds);
   const subAgentInstances = useSimulationStore((s) => s.subAgentInstances);
   const streamingResponses = useSimulationStore((s) => s.streamingResponses);
@@ -590,14 +583,14 @@ export default function SimulationPage() {
   const [preparing, setPreparing] = useState(true);
   const abortRef = useRef(false);
   const autoPlayTriggered = useRef(false);
-  const [consensusReport, setConsensusReport] = useState<ConsensusReport | null>(null);
+  const [consensusReport] = useState<ConsensusReport | null>(null);
 
   const agents = [...allAgents, ...customAgents];
   const selectedAgents = agents.filter((a) => selectedIds.includes(a.id));
   const totalRounds = config?.totalRounds ?? 4;
 
   // Auto-play ref — always holds the latest playSim
-  const autoPlayRef = useRef<() => void>();
+  const autoPlayRef = useRef<(() => void) | undefined>(undefined);
 
   // On mount: set up config if missing, then auto-play after brief delay
   useEffect(() => {
@@ -624,6 +617,24 @@ export default function SimulationPage() {
 
     return () => clearTimeout(timer);
   }, []);// eslint-disable-line react-hooks/exhaustive-deps
+
+  // Persist a completed simulation to history (upsert by id).
+  useEffect(() => {
+    if (status !== 'completed' || !config) return;
+    const finalRounds = useSimulationStore.getState().rounds;
+    if (finalRounds.length === 0) return;
+    useHistoryStore.getState().saveRun({
+      id: config.id,
+      kind: 'policy',
+      title: config.policy,
+      createdAt: config.createdAt,
+      policy: config.policy,
+      policyTypes: config.policyTypes,
+      totalRounds: config.totalRounds,
+      selectedAgentIds: config.selectedAgentIds,
+      rounds: finalRounds,
+    });
+  }, [status, config]);
 
   // Get responses for the round being viewed
   const viewingRoundData = rounds.find((r) => r.roundNumber === viewingRound);
@@ -885,7 +896,7 @@ export default function SimulationPage() {
                   whileTap={{ scale: 0.95 }}
                   onClick={playSim}
                   disabled={status === 'completed'}
-                  className="px-3 py-1.5 rounded-md bg-primary text-on-surface text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/80 transition-colors"
+                  className="px-3 py-1.5 rounded-md bg-primary text-on-primary text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all"
                 >
                   <span className="flex items-center gap-1.5">
                     <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
@@ -941,7 +952,6 @@ export default function SimulationPage() {
                       <AgentResponseCard
                         response={resp}
                         agent={agent}
-                        agents={agents}
                         subAgentInstances={subAgentInstances}
                         isExpanded={expandedCards.includes(cardId)}
                         onToggle={() => toggleCardExpansion(cardId)}

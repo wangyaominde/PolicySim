@@ -16,12 +16,6 @@ const SnapshotIcon = () => (
   </svg>
 );
 
-const RoundsIcon = () => (
-  <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
-  </svg>
-);
-
 const SimulationsIcon = () => (
   <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5" />
@@ -58,7 +52,7 @@ export default function Sidebar() {
 
   return (
     <motion.aside
-      className="fixed top-16 left-0 bottom-0 z-40 bg-surface-container-low flex flex-col overflow-hidden"
+      className="fixed top-16 left-0 bottom-0 z-40 bg-surface/60 backdrop-blur-xl border-r border-white/5 flex flex-col overflow-hidden"
       animate={{ width: collapsed ? 64 : 224 }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
     >
@@ -105,10 +99,10 @@ export default function Sidebar() {
             to={item.to}
             end={item.to === '/'}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
+              `relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
                 isActive || item.highlighted
-                  ? 'text-primary bg-primary/10'
-                  : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+                  ? 'text-primary bg-primary/12 ring-1 ring-primary/20 before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-1 before:rounded-full before:bg-primary'
+                  : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container font-medium'
               }`
             }
           >
@@ -135,10 +129,8 @@ export default function Sidebar() {
         {/* New Simulation button */}
         <NavLink
           to="/"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-on-surface transition-all"
-          style={{
-            background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-container))',
-          }}
+          className="glow-primary flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-bold text-on-primary transition-all hover:brightness-110"
+          style={{ background: 'var(--grad-voltage)' }}
         >
           <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import type { Agent } from '../types';
 import { PRESET_AGENTS } from '../data/presetAgents';
@@ -19,47 +20,76 @@ interface AgentState {
 }
 
 export const useAgentStore = create<AgentState>()(
-  immer((set, get) => ({
-    agents: PRESET_AGENTS,
-    selectedIds: PRESET_AGENTS.map(a => a.id),
-    customAgents: [],
+  persist(
+    immer((set, get) => ({
+      agents: PRESET_AGENTS,
+      selectedIds: PRESET_AGENTS.map((a) => a.id),
+      customAgents: [],
 
-    toggleAgent: (id) => set((state) => {
-      const idx = state.selectedIds.indexOf(id);
-      if (idx >= 0) {
-        if (state.selectedIds.length > 3) state.selectedIds.splice(idx, 1);
-      } else {
-        if (state.selectedIds.length < 12) state.selectedIds.push(id);
-      }
-    }),
+      toggleAgent: (id) => set((state) => {
+        const idx = state.selectedIds.indexOf(id);
+        if (idx >= 0) {
+          // Floor of 2 so decision-mode can use as few as 2 reviewers; policy
+          // mode still enforces its own >=3 requirement at launch.
+          if (state.selectedIds.length > 2) state.selectedIds.splice(idx, 1);
+        } else {
+          if (state.selectedIds.length < 12) state.selectedIds.push(id);
+        }
+      }),
 
-    selectAll: () => set((state) => {
-      state.selectedIds = [...state.agents, ...state.customAgents].map(a => a.id);
-    }),
+      selectAll: () => set((state) => {
+        state.selectedIds = [...state.agents, ...state.customAgents].map((a) => a.id);
+      }),
 
-    deselectAll: () => set((state) => {
-      state.selectedIds = state.selectedIds.slice(0, 3);
-    }),
+      deselectAll: () => set((state) => {
+        state.selectedIds = state.selectedIds.slice(0, 3);
+      }),
 
-    addCustomAgent: (agent) => set((state) => {
-      state.customAgents.push(agent);
-      state.selectedIds.push(agent.id);
-    }),
+      addCustomAgent: (agent) => set((state) => {
+        state.customAgents.push(agent);
+        state.selectedIds.push(agent.id);
+      }),
 
-    updateAgent: (id, updates) => set((state) => {
-      const agent = [...state.agents, ...state.customAgents].find(a => a.id === id);
-      if (agent) Object.assign(agent, updates);
-    }),
+      updateAgent: (id, updates) => set((state) => {
+        const agent = [...state.agents, ...state.customAgents].find((a) => a.id === id);
+        if (agent) Object.assign(agent, updates);
+      }),
 
-    removeCustomAgent: (id) => set((state) => {
-      state.customAgents = state.customAgents.filter(a => a.id !== id);
-      state.selectedIds = state.selectedIds.filter(sid => sid !== id);
-    }),
+      removeCustomAgent: (id) => set((state) => {
+        state.customAgents = state.customAgents.filter((a) => a.id !== id);
+        state.selectedIds = state.selectedIds.filter((sid) => sid !== id);
+      }),
 
-    getSelectedAgents: () => {
-      const state = get();
-      const all = [...state.agents, ...state.customAgents];
-      return all.filter(a => state.selectedIds.includes(a.id));
+      getSelectedAgents: () => {
+        const state = get();
+        const all = [...state.agents, ...state.customAgents];
+        return all.filter((a) => state.selectedIds.includes(a.id));
+      },
+    })),
+    {
+      name: 'policysim-agents',
+      version: 1,
+      storage: createJSONStorage(() => localStorage),
+      // Persist only user data — presets always come fresh from code.
+      partialize: (state) => ({
+        customAgents: state.customAgents,
+        selectedIds: state.selectedIds,
+      }),
+      // Drop any persisted ids that no longer resolve to a preset or custom agent.
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<AgentState>;
+        const customAgents = p.customAgents ?? [];
+        const validIds = new Set([
+          ...current.agents.map((a) => a.id),
+          ...customAgents.map((a) => a.id),
+        ]);
+        const selectedIds = (p.selectedIds ?? current.selectedIds).filter((id) => validIds.has(id));
+        return {
+          ...current,
+          customAgents,
+          selectedIds: selectedIds.length >= 2 ? selectedIds : current.selectedIds,
+        };
+      },
     },
-  }))
+  ),
 );

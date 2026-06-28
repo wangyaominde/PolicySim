@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion';
+import type { Variants } from 'framer-motion';
 import { useSimulationStore } from '../stores';
 
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -9,7 +10,7 @@ const containerVariants = {
   },
 };
 
-const sectionVariants = {
+const sectionVariants: Variants = {
   hidden: { opacity: 0, y: 24 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } },
 };

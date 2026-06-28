@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import AppLayout from './components/layout/AppLayout';
 import HomePage from './pages/HomePage';
 import SimulationPage from './pages/SimulationPage';
+import AdvisoryPage from './pages/AdvisoryPage';
 import ReportPage from './pages/ReportPage';
 import AgentsPage from './pages/AgentsPage';
 import HistoryPage from './pages/HistoryPage';
@@ -13,6 +14,7 @@ export default function App() {
         <Route element={<AppLayout />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/sim/:id" element={<SimulationPage />} />
+          <Route path="/advisory/:id" element={<AdvisoryPage />} />
           <Route path="/report/:id" element={<ReportPage />} />
           <Route path="/agents" element={<AgentsPage />} />
           <Route path="/history" element={<HistoryPage />} />

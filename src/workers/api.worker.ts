@@ -178,7 +178,7 @@ async function callAPI(
 async function callAPINonStreaming(
   systemPrompt: string,
   apiKey: string,
-  agentId: string,
+  _agentId: string,
   onChunk: (chunk: string) => void
 ): Promise<string> {
   const apiUrl = `${API_BASE_URL}/v1/messages`;

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import type { Variants } from 'framer-motion';
 import { useAgentStore } from '../stores';
 import type { Agent } from '../types';
 import AIAgentCreator from '../components/agents/AIAgentCreator';
@@ -9,7 +10,7 @@ const cardHover = {
   hover: { y: -4, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', transition: { duration: 0.2 } },
 };
 
-const panelVariants = {
+const panelVariants: Variants = {
   hidden: { x: 40, opacity: 0 },
   visible: { x: 0, opacity: 1, transition: { type: 'spring', stiffness: 300, damping: 28 } },
   exit: { x: 40, opacity: 0, transition: { duration: 0.2 } },
@@ -232,7 +233,7 @@ export default function AgentsPage() {
                   onClick={() => setManualOverride(!manualOverride)}
                   className={`flex items-center gap-2 text-[10px] font-mono tracking-widest uppercase px-3 py-1 rounded-full transition-colors ${
                     manualOverride
-                      ? 'bg-primary text-on-surface'
+                      ? 'bg-primary text-on-primary'
                       : 'bg-surface-container-high text-on-surface-variant'
                   }`}
                 >
@@ -301,7 +302,7 @@ export default function AgentsPage() {
             </div>
 
             {/* Save button */}
-            <button className="mt-auto w-full py-3 rounded-lg bg-primary text-on-surface font-mono text-sm tracking-wider font-semibold hover:opacity-90 transition-opacity bg-gradient-to-r from-primary to-primary/80">
+            <button className="mt-auto w-full py-3 rounded-lg text-on-primary font-mono text-sm tracking-wider font-semibold glow-primary hover:brightness-110 transition-all bg-gradient-to-r from-primary via-secondary to-tertiary">
               Save Archetype Configuration
             </button>
           </motion.div>

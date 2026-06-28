@@ -1,9 +1,5 @@
 // Compute Worker - handles alliance calculation and graph layout off main thread
 
-interface AllianceInput {
-  responses: any[];
-}
-
 interface GraphLayoutInput {
   nodes: { id: string; type: 'main' | 'sub'; parentId?: string; influence: number }[];
   edges: { source: string; target: string; type: string; strength: number }[];
@@ -69,7 +65,7 @@ function computeAlliances(responses: any[]) {
 }
 
 function computeGraphLayout(input: GraphLayoutInput) {
-  const { nodes, edges, width, height } = input;
+  const { nodes, width, height } = input;
   const positions: Record<string, { x: number; y: number }> = {};
 
   // Simple circular layout for main nodes, satellite for sub nodes
@@ -89,7 +85,7 @@ function computeGraphLayout(input: GraphLayoutInput) {
   });
 
   // Place sub nodes as satellites around their parent
-  subNodes.forEach((node, i) => {
+  subNodes.forEach((node) => {
     const parent = positions[node.parentId || ''];
     if (parent) {
       const subCount = subNodes.filter(n => n.parentId === node.parentId).length;

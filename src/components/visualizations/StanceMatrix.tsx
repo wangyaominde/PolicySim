@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import * as d3 from 'd3';
-import type { Agent, AgentResponse, Stance } from '../../types';
+import type { Agent, AgentResponse } from '../../types';
 import { useSimulationStore } from '../../stores';
 import { useAgentStore } from '../../stores';
 
@@ -71,7 +71,6 @@ function buildLiveMatrix(
   responses: AgentResponse[],
 ): number[][] {
   const n = agents.length;
-  const idxMap = new Map(agents.map((a, i) => [a.id, i]));
   const matrix: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
   const respMap = new Map(responses.map((r) => [r.agentId, r]));
 

@@ -188,3 +188,130 @@ export type WorkerEvent =
 
 // View types for the right panel
 export type VisualizationView = 'graph' | 'matrix' | 'flow';
+
+/* ================================================================== */
+/*  Decision Review (Advisory) — multi-role document review → consensus */
+/* ================================================================== */
+
+// A user-uploaded source document with extracted plain text
+export interface SourceDocument {
+  id: string;
+  name: string;
+  mime: string;
+  size: number;        // bytes
+  content: string;     // extracted plain text
+  charCount: number;
+  truncated: boolean;  // content was clipped for the token budget
+  status: 'parsing' | 'ready' | 'error';
+  error?: string;
+}
+
+// A role's recommendation on the decision (ordered from most positive to most negative)
+export type Verdict =
+  | 'strong_yes'
+  | 'lean_yes'
+  | 'neutral'
+  | 'lean_no'
+  | 'strong_no'
+  | 'need_info';
+
+export const VERDICT_ORDER: Verdict[] = [
+  'strong_yes', 'lean_yes', 'neutral', 'lean_no', 'strong_no', 'need_info',
+];
+
+export interface ReviewEvidence {
+  quote: string;   // short excerpt from the documents
+  note: string;    // why it matters
+}
+
+// One role's review of the documents against the task
+export interface RoleReview {
+  agentId: string;
+  verdict: Verdict;
+  confidence: number;        // 0-1
+  headline: string;          // one-line takeaway
+  keyPoints: string[];       // observations through this role's lens
+  concerns: string[];        // risks / objections
+  recommendation: string;    // what this role advises
+  evidence: ReviewEvidence[];
+  optionPreference?: string; // if the task has options, which this role prefers
+  streamingText?: string;
+  isStreaming?: boolean;
+  status: 'pending' | 'reading' | 'done' | 'error';
+}
+
+// The synthesized, unified decision brief
+export interface DecisionSynthesis {
+  decision: string;            // the recommended decision (the "拍板" line)
+  recommendedOption?: string;  // if the task provided options
+  confidence: number;          // 0-1 overall confidence
+  consensusLevel: number;      // 0-1 agreement among roles
+  summary: string;             // executive summary
+  rationale: string;           // core reasoning
+  agreements: string[];        // points of consensus
+  disagreements: string[];     // points of contention / dissent to weigh
+  risks: string[];
+  actionItems: string[];
+  openQuestions: string[];
+  voteTally: Partial<Record<Verdict, number>>; // computed deterministically from reviews
+  streamingText?: string;
+  isStreaming?: boolean;
+}
+
+export interface AdvisoryTask {
+  question: string;    // the decision task / question
+  options: string[];   // optional candidate options to choose among
+  context: string;     // optional extra background
+}
+
+export interface AdvisoryConfig {
+  id: string;
+  task: AdvisoryTask;
+  documents: SourceDocument[];
+  roleIds: string[];   // agent ids participating as reviewers
+  createdAt: number;
+}
+
+export type AdvisoryStatus =
+  | 'idle'
+  | 'reading'
+  | 'synthesizing'
+  | 'completed'
+  | 'error';
+
+// Lightweight document payload sent to the worker (no UI-only fields)
+export interface DocumentPayload {
+  id: string;
+  name: string;
+  content: string;
+}
+
+// --- Advisory worker communication protocol ---
+export type AdvisoryCommand =
+  | {
+      type: 'START_REVIEW';
+      roles: Agent[];
+      task: AdvisoryTask;
+      documents: DocumentPayload[];
+      apiKey: string;
+      apiBaseUrl?: string;
+      model?: string;
+      maxConcurrency: number;
+    }
+  | {
+      type: 'SYNTHESIZE';
+      reviews: RoleReview[];
+      roleNames: Record<string, string>;
+      task: AdvisoryTask;
+      apiKey: string;
+      apiBaseUrl?: string;
+      model?: string;
+    };
+
+export type AdvisoryEvent =
+  | { type: 'REVIEW_STREAM_CHUNK'; agentId: string; chunk: string }
+  | { type: 'REVIEW_COMPLETE'; agentId: string; review: RoleReview }
+  | { type: 'ALL_REVIEWS_COMPLETE' }
+  | { type: 'SYNTHESIS_STREAM_CHUNK'; chunk: string }
+  | { type: 'SYNTHESIS_COMPLETE'; synthesis: DecisionSynthesis }
+  | { type: 'ADVISORY_ERROR'; agentId?: string; error: string };

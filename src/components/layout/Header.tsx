@@ -12,10 +12,18 @@ export default function Header() {
   const setApiKeyModalOpen = useUIStore((s) => s.setApiKeyModalOpen);
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-surface border-b border-white/5 flex items-center justify-between px-6">
+    <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-surface/70 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-6">
       {/* Left: Logo */}
-      <NavLink to="/" className="flex items-center gap-2">
-        <span className="text-primary font-headline font-bold text-xl tracking-tight">
+      <NavLink to="/" className="flex items-center gap-2.5 group">
+        <motion.span
+          whileHover={{ rotate: 8, scale: 1.08 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 18 }}
+          className="grid place-items-center w-8 h-8 rounded-lg text-on-primary font-headline font-bold text-base shadow-lg"
+          style={{ background: 'var(--grad-voltage)' }}
+        >
+          P
+        </motion.span>
+        <span className="font-headline font-bold text-xl tracking-tight text-voltage">
           PolicySim
         </span>
       </NavLink>
@@ -45,7 +53,8 @@ export default function Header() {
                 {isActive && (
                   <motion.div
                     layoutId="nav-underline"
-                    className="absolute -bottom-2 left-0 right-0 h-0.5 bg-primary rounded-full"
+                    className="absolute -bottom-2 left-0 right-0 h-[3px] rounded-full"
+                    style={{ background: 'var(--grad-voltage)' }}
                     transition={{ type: 'spring', stiffness: 380, damping: 30 }}
                   />
                 )}
@@ -61,7 +70,7 @@ export default function Header() {
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.97 }}
           onClick={() => setApiKeyModalOpen(true)}
-          className="text-sm text-on-surface-variant hover:text-primary transition-colors font-medium"
+          className="text-sm font-semibold px-3.5 py-1.5 rounded-full bg-surface-container-high text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-colors"
         >
           API Settings
         </motion.button>

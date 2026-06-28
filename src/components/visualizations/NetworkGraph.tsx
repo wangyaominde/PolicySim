@@ -260,8 +260,8 @@ export default function NetworkGraph({ width: propWidth, height: propHeight }: N
 
   // ── Main D3 render ─────────────────────────────────────────────────────────
   useEffect(() => {
-    const svg = d3.select(svgRef.current);
     if (!svgRef.current) return;
+    const svg = d3.select(svgRef.current);
 
     const { width: W, height: H } = dimensions;
 

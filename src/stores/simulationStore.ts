@@ -8,6 +8,7 @@ import type {
   SubAgentResult,
   AgentResponse,
 } from '../types';
+import type { PolicyHistoryRun } from './historyStore';
 
 interface SimulationState {
   config: SimulationConfig | null;
@@ -20,6 +21,7 @@ interface SimulationState {
 
   // Actions
   startSimulation: (config: SimulationConfig) => void;
+  loadRun: (run: PolicyHistoryRun) => void;
   setStatus: (status: SimulationStatus) => void;
   addResponse: (response: AgentResponse) => void;
   appendStreamChunk: (agentId: string, chunk: string) => void;
@@ -50,6 +52,26 @@ export const useSimulationStore = create<SimulationState>()(
       state.rounds = [];
       state.currentRound = 1;
       state.status = 'configuring';
+      state.subAgentInstances = [];
+      state.streamingResponses = {};
+      state.error = null;
+    }),
+
+    loadRun: (run) => set((state) => {
+      // Rehydrate a completed simulation from history for replay/viewing.
+      state.config = {
+        id: run.id,
+        policy: run.policy,
+        policyTypes: run.policyTypes,
+        totalRounds: run.totalRounds,
+        selectedAgentIds: run.selectedAgentIds,
+        workerConcurrency: 'medium',
+        consensusRuns: 1,
+        createdAt: run.createdAt,
+      };
+      state.rounds = run.rounds;
+      state.currentRound = run.totalRounds;
+      state.status = 'completed';
       state.subAgentInstances = [];
       state.streamingResponses = {};
       state.error = null;
